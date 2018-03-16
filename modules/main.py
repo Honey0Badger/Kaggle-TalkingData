@@ -6,6 +6,7 @@ import math
 
 
 import tensorflow as tf
+import pandas as pd
 
 from preprocess import *
 from models import *
@@ -13,7 +14,6 @@ from preprocess import *
 from pipelines import *
 
 tf.python.control_flow_ops = tf
-
 
 start = time.time()
 
@@ -39,8 +39,7 @@ X_train, X_val, y_train, y_val, xgtrain = num_cat_train_valid_split(data, cat_co
 (train_blend_x_gbm_le,
  test_blend_x_gbm_le,
  blend_scores_gbm_le,
- best_rounds_gbm_le) = gbm_blend(est_GBM_reg, train_x, train_y, test_x, len(est_GBM_reg,
-                                 500) #as the learning rate decreases the number of stopping rounds need to be increased
+ best_rounds_gbm_le) = gbm_blend(est_GBM_reg, train_x, train_y, test_x, 4, 500)
 
 print (np.mean(blend_scores_gbm_le,axis=0))
 print (np.mean(best_rounds_gbm_le,axis=0))
@@ -51,7 +50,7 @@ np.savetxt("../input/test_blend_x_gbm_le.csv",test_blend_x_gbm_le, delimiter=","
 (train_blend_x_xgb_le,
  test_blend_x_xgb_le,
  blend_scores_xgb_le,
- best_rounds_xgb_le) = xgb_blend(est_XGB_reg, train_x, train_y, test_x, len(est_XGB_reg, 500)
+ best_rounds_xgb_le) = xgb_blend(est_XGB_reg, train_x, train_y, test_x, 4, 500)
 
 print(np.mean(blend_scores_xgb_le, axis=0))
 print(np.mean(best_rounds_xgb_le, axis=0))
@@ -65,7 +64,7 @@ X_train, X_val, y_train, y_val, xgtrain = num_OHE_train_valid_split(data_sparse,
 (train_blend_x_gbm_ohe,
  test_blend_x_gbm_ohe,
  blend_scores_gbm_ohe,
- best_rounds_gbm_ohe) = gbm_blend(est_GBM_reg, train_x, train_y, test_x, len(est_GBM_reg), 500)
+ best_rounds_gbm_ohe) = gbm_blend(est_GBM_reg, train_x, train_y, test_x, 4, 500)
 
 print (np.mean(blend_scores_gbm_ohe,axis=0))
 print (np.mean(best_rounds_gbm_ohe,axis=0))
@@ -76,7 +75,7 @@ np.savetxt("../input/test_blend_x_gbm_ohe.csv",test_blend_x_gbm_ohe, delimiter="
 (train_blend_x_xgb_ohe,
  test_blend_x_xgb_ohe,
  blend_scores_xgb_ohe,
- best_rounds_xgb_ohe) = xgb_blend(est_XGB_reg, train_x, train_y, test_x, len(est_XGB_reg), 1000)
+ best_rounds_xgb_ohe) = xgb_blend(est_XGB_reg, train_x, train_y, test_x, 4, 1000)
 
 print(np.mean(blend_scores_xgb_ohe, axis=0))
 print(np.mean(best_rounds_xgb_ohe, axis=0))
@@ -85,30 +84,56 @@ np.savetxt("../input/test_blend_x_xgb_ohe.csv", test_blend_x_xgb_ohe, delimiter=
 
 
 # NN model
-bagging_num = 10
-nn_parameters = []
-
-nn_parameter =  { 'input_size' :400 ,
-     'input_dim' : train_x.shape[1],
-     'input_drop_out' : 0.5 ,
-     'hidden_size' : 200 ,
-     'hidden_drop_out' :0.3,
-     'learning_rate': 0.1,
-     'optimizer': 'adadelta'
-    }
-
-for i in range(bagging_num):
-    nn_parameters.append(nn_parameter)
-
-
-
 (train_blend_x_ohe_mlp,
  test_blend_x_ohe_mlp,
  blend_scores_ohe_mlp,
- best_round_ohe_mlp) = nn_blend_data(nn_parameters, train_x, train_y, test_x, len(nn_parameters), 5)
+ best_round_ohe_mlp) = nn_blend_data(train_x, train_y, test_x, 4, 5)
 
 print (np.mean(blend_scores_ohe_mlp,axis=0))
 print (np.mean(best_round_ohe_mlp,axis=0))
 print ( log_mae(np.mean(train_blend_x_ohe_mlp,axis=1).reshape(train_size,1),train_y))
 np.savetxt("../input/train_blend_x_ohe_mlp.csv",train_blend_x_ohe_mlp, delimiter=",")
 np.savetxt("../input/test_blend_x_ohe_mlp.csv",test_blend_x_ohe_mlp, delimiter=",")
+
+
+print  ("Blending.")
+
+train_models = (train_blend_x_gbm_le,
+                train_blend_x_xgb_le,
+                train_blend_x_xgb_ohe,
+                train_blend_x_gbm_ohe,
+                np.mean(train_blend_x_ohe_mlp,axis=1).reshape(train_size,1))
+
+test_models  = (test_blend_x_gbm_le,
+                test_blend_x_xgb_le,
+                test_blend_x_xgb_ohe,
+                test_blend_x_gbm_ohe,
+                np.mean(test_blend_x_ohe_mlp,axis=1).reshape(test_size,1))
+
+pred_y_ridge = ridge_blend(train_models, test_models)
+results = pd.DataFrame()
+results['id'] = full_data[train_size:].id
+results['loss'] = pred_y_ridge
+results.to_csv("../output/sub_ridge_blended.csv", index=False)
+print ("Submission created.")
+
+
+pred_y_gblinear = gblinear_blend(train_models, test_models)
+results = pd.DataFrame()
+results['id'] = full_data[train_size:].id
+results['loss'] = pred_y_gblinear
+results.to_csv("../output/sub_xgb_gblinear.csv", index=False)
+print ("Submission created.")
+
+## Final submission
+#  weights: [0.5,0.5]
+
+pred_y = pred_y_ridge*0.5 + pred_y_gblinear*0.5
+
+results = pd.DataFrame()
+results['id'] = full_data[train_size:].id
+results['loss'] = pred_y
+results.to_csv("../output/sub_final.csv", index=False)
+
+endtime = time.time()
+print ("Submission created.")

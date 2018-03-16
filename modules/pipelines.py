@@ -1,22 +1,30 @@
 
+from sklearn import  model_selection
 from sklearn.model_selection import StratifiedKFold, KFold
 from sklearn.model_selection import GridSearchCV
+from sklearn.linear_model import ElasticNet, Ridge, LinearRegression
+
+from pylightgbm.models import GBMRegressor
+
+from keras.callbacks import EarlyStopping, ModelCheckpoint
+
+import xgboost as xgb
 
 from models import *
 from metric import *
 
-
+import time
 
 def search_model(train_x, train_y, est, param_grid, n_jobs, cv, refit=False):
     ##Grid Search for the best model
-    model = model_selection.GridSearchCV(estimator=est,
-                                         param_grid=param_grid,
-                                         scoring=log_mae_scorer,
-                                         verbose=10,
-                                         n_jobs=n_jobs,
-                                         iid=True,
-                                         refit=refit,
-                                         cv=cv)
+    model = GridSearchCV(estimator=est,
+                         param_grid=param_grid,
+                         scoring=log_mae_scorer,
+                         verbose=10,
+                         n_jobs=n_jobs,
+                         iid=True,
+                         refit=refit,
+                         cv=cv)
     # Fit Grid Search Model
     model.fit(train_x, train_y)
     print("Best score: %0.3f" % model.best_score_)
@@ -29,14 +37,14 @@ def search_model(train_x, train_y, est, param_grid, n_jobs, cv, refit=False):
 
 def search_model_mae(train_x, train_y, est, param_grid, n_jobs, cv, refit=False):
     ##Grid Search for the best model
-    model = model_selection.GridSearchCV(estimator=est,
-                                         param_grid=param_grid,
-                                         scoring='neg_mean_absolute_error',
-                                         verbose=10,
-                                         n_jobs=n_jobs,
-                                         iid=True,
-                                         refit=refit,
-                                         cv=cv)
+    model = GridSearchCV(estimator=est,
+                         param_grid=param_grid,
+                         scoring='neg_mean_absolute_error',
+                         verbose=10,
+                         n_jobs=n_jobs,
+                         iid=True,
+                         refit=refit,
+                         cv=cv)
     # Fit Grid Search Model
     model.fit(train_x, train_y)
     print("Best score: %0.3f" % model.best_score_)
@@ -164,9 +172,22 @@ def gbm_blend(estimators, train_x, train_y, test_x, fold, early_stopping_rounds=
     return (train_blend_x, test_blend_x, scores, best_rounds)
 
 
-def nn_blend_data(parameters, train_x, train_y, test_x, fold, early_stopping_rounds=0, batch_size=128):
+def nn_blend_data(train_x, train_y, test_x, fold, early_stopping_rounds=0, batch_size=128):
     print("Blend %d estimators for %d folds" % (len(parameters), fold))
     skf = list(KFold(len(train_y), fold))
+    # setup callbacks and checkpoint functions
+    early_stop = EarlyStopping(monitor='val_mae_log', patience=5, verbose=0, mode='auto')
+    checkpointer = ModelCheckpoint(filepath="../tmp/weights.hdf5", monitor='val_mae_log', verbose=0, save_best_only=True,
+                                   mode='min')
+    bagging_num = 10
+    nn_parameters = []
+
+    nn_parameter =  { 'input_size' :400, 'input_dim' : train_x.shape[1], 'input_drop_out':0.5,
+                      'hidden_size' : 200, 'hidden_drop_out' :0.3, 'learning_rate': 0.1, 'optimizer': 'adadelta' }
+
+    for i in range(bagging_num):
+        nn_parameters.append(nn_parameter)
+
 
     train_blend_x = np.zeros((train_x.shape[0], len(parameters)))
     test_blend_x = np.zeros((test_x.shape[0], len(parameters)))
@@ -193,12 +214,12 @@ def nn_blend_data(parameters, train_x, train_y, test_x, fold, early_stopping_rou
                                       validation_data=(val_x_fold.todense(), val_y_fold),
                                       verbose=0,
                                       callbacks=[
-                                          #                                                 EarlyStopping(monitor='val_mae_log'
-                                          #                                                               , patience=early_stopping_rounds, verbose=0, mode='auto'),
+                                          # EarlyStopping(monitor='val_mae_log'
+                                          #, patience=early_stopping_rounds, verbose=0, mode='auto'),
                                           ModelCheckpoint(filepath="../tmp/weights.hdf5"
                                                           , monitor='val_mae_log',
                                                           verbose=1, save_best_only=True, mode='min')
-                                      ]
+                                                ]
                                       )
 
             best_round = sorted([[id, mae] for [id, mae] in enumerate(fit.history['val_mae_log'])], key=lambda x: x[1],
@@ -232,3 +253,72 @@ def nn_blend_data(parameters, train_x, train_y, test_x, fold, early_stopping_rou
         print("Score for model %d is %f" % (j + 1, np.mean(scores[:, j])))
     print("Score for blended models is %f" % (np.mean(scores)))
     return (train_blend_x, test_blend_x, scores, best_rounds)
+
+
+
+def batch_generator(X, y, batch_size, shuffle):
+        number_of_batches = np.ceil(X.shape[0]/batch_size)
+        counter = 0
+        sample_index = np.arange(X.shape[0])
+        if shuffle:
+                np.random.shuffle(sample_index)
+        while True:
+                batch_index = sample_index[batch_size*counter:batch_size*(counter+1)]
+                X_batch = X[batch_index,:].toarray()
+                y_batch = y[batch_index]
+                counter += 1
+                yield X_batch, y_batch
+                if (counter == number_of_batches):
+                        if shuffle:
+                                np.random.shuffle(sample_index)
+                        counter = 0
+
+
+def batch_generatorp(X, batch_size, shuffle):
+        number_of_batches = X.shape[0] / np.ceil(X.shape[0]/batch_size)
+        counter = 0
+        sample_index = np.arange(X.shape[0])
+        while True:
+                batch_index = sample_index[batch_size * counter:batch_size * (counter + 1)]
+                X_batch = X[batch_index, :].toarray()
+                counter += 1
+                yield X_batch
+                if (counter == number_of_batches):
+                        counter = 0
+
+def ridge_blend(train_models):
+        param_grid = { 'alpha':[0,0.00001,0.00003,0.0001,0.0003,0.001,0.003,0.01,
+                                 0.03,0.1,0.3,1,3,10,15,20,25,30,35,40,45,50,55,60,70]}
+        model = search_model(np.hstack(train_models)
+                             , train_y
+                             , Ridge()
+                             , param_grid
+                             , n_jobs=1
+                             , cv=4
+                             , refit=True)
+
+        print ("best subsample:", model.best_params_)
+       
+        pred_y_ridge = np.exp(model.predict(np.hstack(test_models))) - lift
+        return pred_y_ridge
+
+def gblinear_blend(train_models, test_models):
+        params = { 'eta': 0.1, 'booster': 'gblinear', 'lambda': 0, 'alpha': 0,
+                   'lambda_bias' : 0, 'silent': 0, 'verbose_eval': True, 'seed': 1234 }
+
+        xgb.cv(params, xgb.DMatrix(np.hstack(train_models)
+                                , label=train_y,missing=np.nan)
+                                , num_boost_round=100000, nfold=4
+                                , feval=xg_eval_mae
+                                , seed=1234
+                                , callbacks=[xgb.callback.early_stop(500)])
+
+        xgtrain_blend = xgb.DMatrix(np.hstack(train_models), label=train_y, missing=np.nan)
+
+        xgb_model=xgb.train(params, xgtrain_blend,
+                            num_boost_round=<best round of xgb.cv from above>,
+                            feval=xg_eval_mae)
+
+        pred_y_gblinear = np.exp(xgb_model.predict(xgb.DMatrix(np.hstack(test_models)))) - lift
+
+        return pred_y_gblinear
