@@ -1,6 +1,7 @@
 import xgboost as xgb
 
 from scipy import sparse
+from sklearn.model_selection import train_test_split
 from scipy.stats import skew, boxcox
 from sklearn import preprocessing
 
@@ -24,15 +25,35 @@ def merge_train_test(train_data, test_data):
         print ("Full Data set created.")
         return full_data
 
+def train_test_data(full_data, cat_cols, num_cols, train_size):
+        lift = 200
+        full_cols = num_cols + cat_cols
+        train_x = full_data[full_cols][:train_size].values
+        test_x = full_data[full_cols][train_size:].values
+        train_y = np.log(full_data[:train_size].loss.values + lift)
+        ID = full_data.id[:train_size].values
+        return train_x, train_y, test_x
+
+def sparse_train_test_data(sparse_data, full_data,  num_cols, train_size):
+        lift = 200
+        full_data_sparse = sparse.hstack((sparse_data
+                                         ,full_data[num_cols])
+                                         ,format='csr'
+                                        )
+        train_x = sparse_data[:train_size]
+        test_x = sparse_data[train_size:]
+        train_y = np.log(full_data[:train_size].loss.values + lift)
+        return train_x, train_y, test_x
+
 
 def data_features(data):
         data_types = data.dtypes
         cat_cols = list(data_types[data_types=='object'].index)
         num_cols = list(data_types[data_types=='int64'].index) + list(data_types[data_types=='float64'].index)
         id_col = 'id'
-        target_col = 'is_attributed'
+        target_col = 'loss'
         num_cols.remove('id')
-        num_cols.remove('is_attributed')
+        num_cols.remove('loss')
 
         print ( "Categorical features:", cat_cols)
         print ( "Numerica features:", num_cols)
@@ -56,13 +77,8 @@ def one_hot_encoding(data, cat_cols):
         return data_sparse
 
 def process_num_data(data, num_cols):
-    """ Numeric features
-        We will apply two preprocessings on numeric features:
-        1. Apply box-cox transformations for skewed numeric features.
-        2. Scale numeric features so they will fall in the range between 0 and 1.
-        """
         skewed_cols = data[num_cols].apply(lambda x: skew(x.dropna()))
-        print (skewed_cols.sort_values())
+        print(skewed_cols.sort_values())
 
         #** Apply box-cox transformations: **
         skewed_cols = skewed_cols[skewed_cols > 0.25].index.values
@@ -71,35 +87,14 @@ def process_num_data(data, num_cols):
 
         #** Apply Standard Scaling:**
         for col in num_cols:
-                data[col] = preprocessing.StandardScaler().fit_transform(data[col])
+                data[[col]] = preprocessing.StandardScaler().fit_transform(data[[col]])
         return data
 
-def num_cat_train_valid_split(data, cat_cols, num_cols, train_size):
-        lift = 200
-        full_cols = num_cols + cat_cols
-        train_x = data[full_cols][:train_size].values
-        test_x = data[full_cols][train_size:].values
-        train_y = np.log(data[:train_size].loss.values + lift)
-        ID = data.id[:train_size].values
+def train_valid_split(train_x, train_y):
         X_train, X_val, y_train, y_val = train_test_split(train_x, train_y, train_size=0.8, random_state=1234)
         xgtrain = xgb.DMatrix(train_x, label=train_y, missing=np.nan)
         return X_train, X_val, y_train, y_val, xgtrain
 
-
-def num_OHE_train_valid_split(data_sparse, cat_cols, num_cols, train_size):
-        lift = 200
-        full_data_sparse = sparse.hstack((data_sparse
-                                         ,data[num_cols])
-                                         ,format='csr'
-                                        )
-        print (full_data_sparse.shape)
-        train_x = full_data_sparse[:train_size]
-        test_x = full_data_sparse[train_size:]
-        train_y = np.log(full_data[:train_size].loss.values + lift)
-        ID = full_data.id[:train_size].values
-        xgtrain = xgb.DMatrix(train_x, label=train_y,missing=np.nan) #used for Bayersian Optimization
-        X_train, X_val, y_train, y_val = train_test_split(train_x, train_y, train_size=.80, random_state=1234)
-        return X_train, X_val, y_train, y_val, xgtrain
         
 
 

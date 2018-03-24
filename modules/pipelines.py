@@ -13,6 +13,7 @@ import xgboost as xgb
 from models import *
 from metric import *
 
+import numpy as np
 import time
 
 def search_model(train_x, train_y, est, param_grid, n_jobs, cv, refit=False):
@@ -58,7 +59,7 @@ def search_model_mae(train_x, train_y, est, param_grid, n_jobs, cv, refit=False)
 
 def xgb_blend(estimators, train_x, train_y, test_x, fold, early_stopping_rounds=0):
     print("Blend %d estimators for %d folds" % (len(estimators), fold))
-    skf = list(KFold(len(train_y), fold))
+    skf  = list(KFold(fold).split(train_y))
 
     train_blend_x = np.zeros((train_x.shape[0], len(estimators)))
     test_blend_x = np.zeros((test_x.shape[0], len(estimators)))
@@ -114,7 +115,7 @@ def xgb_blend(estimators, train_x, train_y, test_x, fold, early_stopping_rounds=
 ## LightGBM blending function
 def gbm_blend(estimators, train_x, train_y, test_x, fold, early_stopping_rounds=0):
     print("Blend %d estimators for %d folds" % (len(estimators), fold))
-    skf = list(KFold(len(train_y), fold))
+    skf  = list(KFold(fold).split(train_y))
 
     train_blend_x = np.zeros((train_x.shape[0], len(estimators)))
     test_blend_x = np.zeros((test_x.shape[0], len(estimators)))
@@ -173,21 +174,21 @@ def gbm_blend(estimators, train_x, train_y, test_x, fold, early_stopping_rounds=
 
 
 def nn_blend_data(train_x, train_y, test_x, fold, early_stopping_rounds=0, batch_size=128):
-    print("Blend %d estimators for %d folds" % (len(parameters), fold))
-    skf = list(KFold(len(train_y), fold))
+    skf  = list(KFold(fold).split(train_y))
     # setup callbacks and checkpoint functions
     early_stop = EarlyStopping(monitor='val_mae_log', patience=5, verbose=0, mode='auto')
     checkpointer = ModelCheckpoint(filepath="../tmp/weights.hdf5", monitor='val_mae_log', verbose=0, save_best_only=True,
                                    mode='min')
-    bagging_num = 10
-    nn_parameters = []
+    bagging_num = 1
+    parameters = []
 
     nn_parameter =  { 'input_size' :400, 'input_dim' : train_x.shape[1], 'input_drop_out':0.5,
                       'hidden_size' : 200, 'hidden_drop_out' :0.3, 'learning_rate': 0.1, 'optimizer': 'adadelta' }
 
     for i in range(bagging_num):
-        nn_parameters.append(nn_parameter)
+        parameters.append(nn_parameter)
 
+    print("Blend %d estimators for %d folds" % (len(parameters), fold))
 
     train_blend_x = np.zeros((train_x.shape[0], len(parameters)))
     test_blend_x = np.zeros((test_x.shape[0], len(parameters)))
@@ -209,7 +210,7 @@ def nn_blend_data(train_x, train_y, test_x, fold, early_stopping_rounds=0, batch
             model = nn_model(nn_params)
             print(model)
             fit = model.fit_generator(generator=batch_generator(train_x_fold, train_y_fold, batch_size, True),
-                                      nb_epoch=70,
+                                      nb_epoch=1,
                                       samples_per_epoch=train_x_fold.shape[0],
                                       validation_data=(val_x_fold.todense(), val_y_fold),
                                       verbose=0,
@@ -233,7 +234,7 @@ def nn_blend_data(train_x, train_y, test_x, fold, early_stopping_rounds=0, batch
 
             # print (mean_absolute_error(np.exp(y_val)-200, pred_y))
             val_y_predict_fold = model.predict_generator(generator=batch_generatorp(val_x_fold, batch_size, True),
-                                                         val_samples=val_x_fold.shape[0]
+                                                         steps = val_x_fold.shape[0] / np.ceil(val_x_fold.shape[0]/batch_size)
                                                          )
 
             score = log_mae(val_y_fold, val_y_predict_fold, 200)
@@ -245,7 +246,7 @@ def nn_blend_data(train_x, train_y, test_x, fold, early_stopping_rounds=0, batch
             # Compile model (required to make predictions)
             model.compile(loss='mae', metrics=[mae_log], optimizer=nn_params['optimizer'])
             test_blend_x_j[:, i] = model.predict_generator(generator=batch_generatorp(test_x, batch_size, True),
-                                                           val_samples=test_x.shape[0]
+                                                           steps = test_x.shape[0] / np.ceil(test_x.shape[0]/batch_size),
                                                            ).reshape(test_x.shape[0])
             print("Model %d fold %d fitting finished in %0.3fs" % (j + 1, i + 1, time.time() - fold_start))
 
@@ -286,7 +287,8 @@ def batch_generatorp(X, batch_size, shuffle):
                 if (counter == number_of_batches):
                         counter = 0
 
-def ridge_blend(train_models):
+def ridge_blend(train_models, test_models, train_y):
+        lift = 200
         param_grid = { 'alpha':[0,0.00001,0.00003,0.0001,0.0003,0.001,0.003,0.01,
                                  0.03,0.1,0.3,1,3,10,15,20,25,30,35,40,45,50,55,60,70]}
         model = search_model(np.hstack(train_models)
@@ -294,7 +296,7 @@ def ridge_blend(train_models):
                              , Ridge()
                              , param_grid
                              , n_jobs=1
-                             , cv=4
+                             , cv=2
                              , refit=True)
 
         print ("best subsample:", model.best_params_)
@@ -302,21 +304,22 @@ def ridge_blend(train_models):
         pred_y_ridge = np.exp(model.predict(np.hstack(test_models))) - lift
         return pred_y_ridge
 
-def gblinear_blend(train_models, test_models):
+def gblinear_blend(train_models, test_models, train_y):
+        lift = 200
         params = { 'eta': 0.1, 'booster': 'gblinear', 'lambda': 0, 'alpha': 0,
                    'lambda_bias' : 0, 'silent': 0, 'verbose_eval': True, 'seed': 1234 }
 
         xgb.cv(params, xgb.DMatrix(np.hstack(train_models)
                                 , label=train_y,missing=np.nan)
-                                , num_boost_round=100000, nfold=4
+                                , num_boost_round=100, nfold=2
                                 , feval=xg_eval_mae
                                 , seed=1234
-                                , callbacks=[xgb.callback.early_stop(500)])
+                                , callbacks=[xgb.callback.early_stop(50)])
 
         xgtrain_blend = xgb.DMatrix(np.hstack(train_models), label=train_y, missing=np.nan)
 
         xgb_model=xgb.train(params, xgtrain_blend,
-                            num_boost_round=<best round of xgb.cv from above>,
+                            num_boost_round=0,
                             feval=xg_eval_mae)
 
         pred_y_gblinear = np.exp(xgb_model.predict(xgb.DMatrix(np.hstack(test_models)))) - lift

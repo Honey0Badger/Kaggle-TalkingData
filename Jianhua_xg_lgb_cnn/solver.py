@@ -33,7 +33,7 @@ from keras.optimizers import SGD,Nadam
 
 ##comment out the following two lines if you are using theano
 import tensorflow as tf
-tf.python.control_flow_ops = tf
+#tf.python.control_flow_ops = tf
 
 
 def log_mae(labels, preds, lift=200):
@@ -107,17 +107,19 @@ def search_model_mae(train_x, train_y, est, param_grid, n_jobs, cv, refit=False)
 
 def xgb_blend(estimators, train_x, train_y, test_x, fold, early_stopping_rounds=0):
     print("Blend %d estimators for %d folds" % (len(estimators), fold))
-    skf = list(KFold(len(train_y), fold))
+    #skf = list(KFold(len(train_y), fold))
+    skf  = KFold(fold)
+    nfold = skf.get_n_splits(train_y)
 
     train_blend_x = np.zeros((train_x.shape[0], len(estimators)))
     test_blend_x = np.zeros((test_x.shape[0], len(estimators)))
-    scores = np.zeros((len(skf), len(estimators)))
-    best_rounds = np.zeros((len(skf), len(estimators)))
+    scores = np.zeros((nfold, len(estimators)))
+    best_rounds = np.zeros((nfold, len(estimators)))
 
     for j, est in enumerate(estimators):
         print("Model %d: %s" % (j + 1, est))
-        test_blend_x_j = np.zeros((test_x.shape[0], len(skf)))
-        for i, (train, val) in enumerate(skf):
+        test_blend_x_j = np.zeros((test_x.shape[0], nfold))
+        for i, (train, val) in enumerate(skf.split(train_y)):
             print("Model %d fold %d" % (j + 1, i + 1))
             fold_start = time.time()
             train_x_fold = train_x[train]
@@ -163,23 +165,25 @@ def xgb_blend(estimators, train_x, train_y, test_x, fold, early_stopping_rounds=
 ## LightGBM blending function
 def gbm_blend(estimators, train_x, train_y, test_x, fold, early_stopping_rounds=0):
     print("Blend %d estimators for %d folds" % (len(estimators), fold))
-    skf = list(KFold(len(train_y), fold))
+    print("debug: ", len(train_y))
+    #skf = list(KFold(len(train_y), fold))
+    skf  = KFold(fold)
+    nfold = skf.get_n_splits(train_y)
 
     train_blend_x = np.zeros((train_x.shape[0], len(estimators)))
     test_blend_x = np.zeros((test_x.shape[0], len(estimators)))
-    scores = np.zeros((len(skf), len(estimators)))
-    best_rounds = np.zeros((len(skf), len(estimators)))
+    scores = np.zeros((nfold, len(estimators)))
+    best_rounds = np.zeros((nfold, len(estimators)))
 
     for j, gbm_est in enumerate(estimators):
         print("Model %d: %s" % (j + 1, gbm_est))
-        test_blend_x_j = np.zeros((test_x.shape[0], len(skf)))
+        test_blend_x_j = np.zeros((test_x.shape[0], nfold))
         params = gbm_est.get_params()
-        for i, (train, val) in enumerate(skf):
+        for i, (train, val) in enumerate(skf.split(train_y)):
             print("Model %d fold %d" % (j + 1, i + 1))
             est = GBMRegressor()
             est.param = params
-            #             est.exec_path='/users/cchen1/library/LightGBM/lightgbm'
-            est.exec_path = '/Users/Jianhua/anaconda/lightgbm'
+            est.exec_path = '/opt/LightGBM/lightgbm'
             print(est)
             fold_start = time.time()
             train_x_fold = train_x[train]
@@ -223,11 +227,11 @@ def gbm_blend(estimators, train_x, train_y, test_x, fold, early_stopping_rounds=
 
 ## Load Data
 start = time.time()
-train_data = pd.read_csv('../input/train.csv')
+train_data = pd.read_csv('../input/train_cut.csv')
 train_size=train_data.shape[0]
 print ("Loading train data finished in %0.3fs" % (time.time() - start))
 
-test_data = pd.read_csv('../input/test.csv')
+test_data = pd.read_csv('../input/test_cut.csv')
 print ("Loading test data finished in %0.3fs" % (time.time() - start))
 
 
@@ -250,9 +254,9 @@ cat_cols = list(data_types[data_types=='object'].index)
 num_cols = list(data_types[data_types=='int64'].index) + list(data_types[data_types=='float64'].index)
 
 id_col = 'id'
-target_col = 'is_attributed'
+target_col = 'loss'
 num_cols.remove('id')
-num_cols.remove('is_attributed')
+num_cols.remove('loss')
 
 print ("Categorical features:", cat_cols)
 print ( "Numerica features:", num_cols)
@@ -314,7 +318,7 @@ for skewed_col in skewed_cols:
 #** Apply Standard Scaling:**
 SSL = preprocessing.StandardScaler()
 for num_col in num_cols:
-    full_data[num_col] = SSL.fit_transform(full_data[num_col])
+    full_data[[num_col]] = SSL.fit_transform(full_data[[num_col]])
 
 
 #### Note: LBL and OHE are likely exclusive so we will use one of them at a time combined
@@ -341,44 +345,24 @@ X_train, X_val, y_train, y_val = train_test_split(train_x, train_y, train_size=.
 ### LightGBM
 ## Choose your best 4 models. Feel free to add more as long as their performance are close enough to the best one.
 
-estimators = [GBMRegressor(exec_path="/users/cchen1/library/LightGBM/lightgbm",
+estimators = [GBMRegressor(exec_path="/opt/LightGBM/lightgbm",
                      learning_rate=0.01, ## use smaller learning rate for better accuracies
-                     num_iterations=100000,
-                     max_bin=<>,
-                     num_leaves=<>,
-                     min_data_in_leaf=<>,
-                     feature_fraction=<>,
-                     bagging_fraction=<>,
+                     num_iterations=100,
                      bagging_freq=1,
                      verbose = True),
-              GBMRegressor(exec_path="/users/cchen1/library/LightGBM/lightgbm",
+              GBMRegressor(exec_path="/opt/LightGBM/lightgbm",
                      learning_rate=0.01, ## use smaller learning rate for better accuracies
-                     num_iterations=100000,
-                     max_bin=<>,
-                     num_leaves=<>,
-                     min_data_in_leaf=<>,
-                     feature_fraction=<>,
-                     bagging_fraction=<>,
+                     num_iterations=100,
                      bagging_freq=1,
                      verbose = True),
-              GBMRegressor(exec_path="/users/cchen1/library/LightGBM/lightgbm",
+              GBMRegressor(exec_path="/opt/LightGBM/lightgbm",
                      learning_rate=0.01, ## use smaller learning rate for better accuracies
-                     num_iterations=100000,
-                     max_bin=<>,
-                     num_leaves=<>,
-                     min_data_in_leaf=<>,
-                     feature_fraction=<>,
-                     bagging_fraction=<>,
+                     num_iterations=100,
                      bagging_freq=1,
                      verbose = True),
-              GBMRegressor(exec_path="/users/cchen1/library/LightGBM/lightgbm",
+              GBMRegressor(exec_path="/opt/LightGBM/lightgbm",
                      learning_rate=0.01, ## use smaller learning rate for better accuracies
-                     num_iterations=100000,
-                     max_bin=<>,
-                     num_leaves=<>,
-                     min_data_in_leaf=<>,
-                     feature_fraction=<>,
-                     bagging_fraction=<>,
+                     num_iterations=100,
                      bagging_freq=1,
                      verbose = True)
         ]
@@ -387,8 +371,8 @@ estimators = [GBMRegressor(exec_path="/users/cchen1/library/LightGBM/lightgbm",
  test_blend_x_gbm_le,
  blend_scores_gbm_le,
  best_rounds_gbm_le) = gbm_blend(estimators, train_x, train_y, test_x,
-                                 4,
-                                 500) #as the learning rate decreases the number of stopping rounds need to be increased
+                                 2,
+                                 100) #as the learning rate decreases the number of stopping rounds need to be increased
 
 print (np.mean(blend_scores_gbm_le,axis=0))
 print (np.mean(best_rounds_gbm_le,axis=0))
@@ -398,44 +382,28 @@ np.savetxt("../input/test_blend_x_gbm_le.csv",test_blend_x_gbm_le, delimiter=","
 ## LE + XGBoost
 estimators = [xgb.XGBRegressor(objective=logregobj,
                                learning_rate=0.01,
-                               n_estimators=10000,
-                               max_depth= <>,
-                               min_child_weight = <>,
-                               colsample_bytree = <>,
-                               subsample = <>,
+                               n_estimators=100,
                                gamma = 1.0,
                                nthread = -1,
                                silent = True,
                                seed = 1234),
               xgb.XGBRegressor(objective=logregobj,
                                learning_rate=0.01,
-                               n_estimators=10000,
-                               max_depth= <>,
-                               min_child_weight = <>,
-                               colsample_bytree = <>,
-                               subsample = <>,
+                               n_estimators=100,
                                gamma = 1.0,
                                nthread = -1,
                                silent = True,
                                seed = 1234),
               xgb.XGBRegressor(objective=logregobj,
                                learning_rate=0.01,
-                               n_estimators=10000,
-                               max_depth= <>,
-                               min_child_weight = <>,
-                               colsample_bytree = <>,
-                               subsample = <>,
+                               n_estimators=100,
                                gamma = 1.0,
                                nthread = -1,
                                silent = True,
                                seed = 1234),
               xgb.XGBRegressor(objective=logregobj,
                                learning_rate=0.01,
-                               n_estimators=10000,
-                               max_depth= <>,
-                               min_child_weight = <>,
-                               colsample_bytree = <>,
-                               subsample = <>,
+                               n_estimators=100,
                                gamma = 1.0,
                                nthread = -1,
                                silent = True,
@@ -449,8 +417,8 @@ estimators = [xgb.XGBRegressor(objective=logregobj,
                                  train_x,
                                  train_y,
                                  test_x,
-                                 4,
-                                 500)
+                                 2,
+                                 100)
 
 print(np.mean(blend_scores_xgb_le, axis=0))
 print(np.mean(best_rounds_xgb_le, axis=0))
@@ -475,44 +443,24 @@ xgtrain = xgb.DMatrix(train_x, label=train_y,missing=np.nan) #used for Bayersian
 X_train, X_val, y_train, y_val = train_test_split(train_x, train_y, train_size=.80, random_state=1234)
 
 ### OHE + LightGBM
-estimators = [GBMRegressor(exec_path="/users/cchen1/library/LightGBM/lightgbm",
+estimators = [GBMRegressor(exec_path="/opt/LightGBM/lightgbm",
                      learning_rate=0.01, ## use smaller learning rate for better accuracies
-                     num_iterations=100000,
-                     max_bin=<>,
-                     num_leaves=<>,
-                     min_data_in_leaf=<>,
-                     feature_fraction=<>,
-                     bagging_fraction=<>,
+                     num_iterations=100,
                      bagging_freq=1,
                      verbose = True),
-              GBMRegressor(exec_path="/users/cchen1/library/LightGBM/lightgbm",
+              GBMRegressor(exec_path="/opt/LightGBM/lightgbm",
                      learning_rate=0.01, ## use smaller learning rate for better accuracies
-                     num_iterations=100000,
-                     max_bin=<>,
-                     num_leaves=<>,
-                     min_data_in_leaf=<>,
-                     feature_fraction=<>,
-                     bagging_fraction=<>,
+                     num_iterations=100,
                      bagging_freq=1,
                      verbose = True),
-              GBMRegressor(exec_path="/users/cchen1/library/LightGBM/lightgbm",
+              GBMRegressor(exec_path="/opt/LightGBM/lightgbm",
                      learning_rate=0.01, ## use smaller learning rate for better accuracies
-                     num_iterations=100000,
-                     max_bin=<>,
-                     num_leaves=<>,
-                     min_data_in_leaf=<>,
-                     feature_fraction=<>,
-                     bagging_fraction=<>,
+                     num_iterations=100,
                      bagging_freq=1,
                      verbose = True),
-              GBMRegressor(exec_path="/users/cchen1/library/LightGBM/lightgbm",
+              GBMRegressor(exec_path="/opt/LightGBM/lightgbm",
                      learning_rate=0.01, ## use smaller learning rate for better accuracies
-                     num_iterations=100000,
-                     max_bin=<>,
-                     num_leaves=<>,
-                     min_data_in_leaf=<>,
-                     feature_fraction=<>,
-                     bagging_fraction=<>,
+                     num_iterations=100,
                      bagging_freq=1,
                      verbose = True)
         ]
@@ -522,8 +470,8 @@ estimators = [GBMRegressor(exec_path="/users/cchen1/library/LightGBM/lightgbm",
  test_blend_x_gbm_ohe,
  blend_scores_gbm_ohe,
  best_rounds_gbm_ohe) = gbm_blend(estimators, train_x, train_y, test_x,
-                                 4,
-                                 500)
+                                 2,
+                                 100)
 
 print (np.mean(blend_scores_gbm_ohe,axis=0))
 print (np.mean(best_rounds_gbm_ohe,axis=0))
@@ -533,44 +481,28 @@ np.savetxt("../input/test_blend_x_gbm_ohe.csv",test_blend_x_gbm_ohe, delimiter="
 ### OHE +XGBoost
 estimators = [xgb.XGBRegressor(objective=logregobj,
                                learning_rate=0.01,
-                               n_estimators=10000,
-                               max_depth= <>,
-                               min_child_weight = <>,
-                               colsample_bytree = <>,
-                               subsample = <>,
+                               n_estimators=100,
                                gamma = 1.0,
                                nthread = -1,
                                silent = True,
                                seed = 1234),
               xgb.XGBRegressor(objective=logregobj,
                                learning_rate=0.01,
-                               n_estimators=10000,
-                               max_depth= <>,
-                               min_child_weight = <>,
-                               colsample_bytree = <>,
-                               subsample = <>,
+                               n_estimators=100,
                                gamma = 1.0,
                                nthread = -1,
                                silent = True,
                                seed = 1234),
               xgb.XGBRegressor(objective=logregobj,
                                learning_rate=0.01,
-                               n_estimators=10000,
-                               max_depth= <>,
-                               min_child_weight = <>,
-                               colsample_bytree = <>,
-                               subsample = <>,
+                               n_estimators=100,
                                gamma = 1.0,
                                nthread = -1,
                                silent = True,
                                seed = 1234),
               xgb.XGBRegressor(objective=logregobj,
                                learning_rate=0.01,
-                               n_estimators=10000,
-                               max_depth= <>,
-                               min_child_weight = <>,
-                               colsample_bytree = <>,
-                               subsample = <>,
+                               n_estimators=100,
                                gamma = 1.0,
                                nthread = -1,
                                silent = True,
@@ -584,8 +516,8 @@ estimators = [xgb.XGBRegressor(objective=logregobj,
                                   train_x,
                                   train_y,
                                   test_x,
-                                  4,
-                                  1000)
+                                  2,
+                                  100)
 
 print(np.mean(blend_scores_xgb_ohe, axis=0))
 print(np.mean(best_rounds_xgb_ohe, axis=0))
@@ -658,17 +590,19 @@ def nn_model(params):
 
 def nn_blend_data(parameters, train_x, train_y, test_x, fold, early_stopping_rounds=0, batch_size=128):
     print("Blend %d estimators for %d folds" % (len(parameters), fold))
-    skf = list(KFold(len(train_y), fold))
+    #skf = list(KFold(len(train_y), fold))
+    skf  = KFold(n_splits=fold)
+    nfold = skf.get_n_splits(train_y)
 
     train_blend_x = np.zeros((train_x.shape[0], len(parameters)))
     test_blend_x = np.zeros((test_x.shape[0], len(parameters)))
-    scores = np.zeros((len(skf), len(parameters)))
-    best_rounds = np.zeros((len(skf), len(parameters)))
+    scores = np.zeros((nfold, len(parameters)))
+    best_rounds = np.zeros((nfold, len(parameters)))
 
     for j, nn_params in enumerate(parameters):
         print("Model %d: %s" % (j + 1, nn_params))
-        test_blend_x_j = np.zeros((test_x.shape[0], len(skf)))
-        for i, (train, val) in enumerate(skf):
+        test_blend_x_j = np.zeros((test_x.shape[0], nfold))
+        for i, (train, val) in enumerate(skf.split(train_y)):
             print("Model %d fold %d" % (j + 1, i + 1))
             fold_start = time.time()
             train_x_fold = train_x[train]
@@ -680,7 +614,7 @@ def nn_blend_data(parameters, train_x, train_y, test_x, fold, early_stopping_rou
             model = nn_model(nn_params)
             print(model)
             fit = model.fit_generator(generator=batch_generator(train_x_fold, train_y_fold, batch_size, True),
-                                      nb_epoch=70,
+                                      nb_epoch=2,
                                       samples_per_epoch=train_x_fold.shape[0],
                                       validation_data=(val_x_fold.todense(), val_y_fold),
                                       verbose=0,
@@ -704,9 +638,11 @@ def nn_blend_data(parameters, train_x, train_y, test_x, fold, early_stopping_rou
 
             # print (mean_absolute_error(np.exp(y_val)-200, pred_y))
             val_y_predict_fold = model.predict_generator(generator=batch_generatorp(val_x_fold, batch_size, True),
-                                                         val_samples=val_x_fold.shape[0]
+                                                         steps = val_x_fold.shape[0] / np.ceil(val_x_fold.shape[0]/batch_size)
+#                                                         val_samples=val_x_fold.shape[0]
                                                          )
 
+            print("debug: ", val_x_fold.shape, val_y_fold.shape, val_y_predict_fold.shape)
             score = log_mae(val_y_fold, val_y_predict_fold, 200)
             print("Score: ", score, mean_absolute_error(val_y_fold, val_y_predict_fold))
             scores[i, j] = score
@@ -716,7 +652,7 @@ def nn_blend_data(parameters, train_x, train_y, test_x, fold, early_stopping_rou
             # Compile model (required to make predictions)
             model.compile(loss='mae', metrics=[mae_log], optimizer=nn_params['optimizer'])
             test_blend_x_j[:, i] = model.predict_generator(generator=batch_generatorp(test_x, batch_size, True),
-                                                           val_samples=test_x.shape[0]
+                                                           steps = test_x.shape[0] / np.ceil(test_x.shape[0]/batch_size),
                                                            ).reshape(test_x.shape[0])
             print("Model %d fold %d fitting finished in %0.3fs" % (j + 1, i + 1, time.time() - fold_start))
 
@@ -725,7 +661,7 @@ def nn_blend_data(parameters, train_x, train_y, test_x, fold, early_stopping_rou
     print("Score for blended models is %f" % (np.mean(scores)))
     return (train_blend_x, test_blend_x, scores, best_rounds)
 
-bagging_num = 10
+bagging_num = 1
 nn_parameters = []
 
 nn_parameter =  { 'input_size' :400 ,
@@ -749,8 +685,8 @@ for i in range(bagging_num):
                                      train_x,
                                      train_y,
                                      test_x,
-                                     4,
-                                     5)
+                                     2,
+                                     2)
 
 print (np.mean(blend_scores_ohe_mlp,axis=0))
 print (np.mean(best_round_ohe_mlp,axis=0))
@@ -780,7 +716,7 @@ model = search_model(np.hstack((train_blend_x_gbm_le,
                                          , Ridge()
                                          , param_grid
                                          , n_jobs=1
-                                         , cv=4
+                                         , cv=2
                                          , refit=True)
 
 print ("best subsample:", model.best_params_)
@@ -806,10 +742,10 @@ xgb.cv(params,
                                 train_blend_x_gbm_ohe,
                                 np.mean(train_blend_x_ohe_mlp,axis=1).reshape(train_size,1)))
                    , label=train_y,missing=np.nan),
-       num_boost_round=100000, nfold=4
+                     num_boost_round=100, nfold=2
                        , feval=xg_eval_mae,
              seed=1234,
-             callbacks=[xgb.callback.early_stop(500)])
+             callbacks=[xgb.callback.early_stop(10)])
 
 
 ## Submission
@@ -818,7 +754,7 @@ pred_y_ridge = np.exp(model.predict(np.hstack((test_blend_x_gbm_le,
                                 test_blend_x_xgb_le,
                                 test_blend_x_xgb_ohe,
                                 test_blend_x_gbm_ohe,
-                                np.mean(train_blend_x_ohe_mlp,axis=1).reshape(test_x.shape[0],1))))) - lift
+                                np.mean(test_blend_x_ohe_mlp,axis=1).reshape(test_x.shape[0],1))))) - lift
 
 results = pd.DataFrame()
 results['id'] = full_data[train_size:].id
@@ -847,7 +783,7 @@ xgtrain_blend = xgb.DMatrix(np.hstack((train_blend_x_gbm_le,
 
 xgb_model=xgb.train(params,
                     xgtrain_blend,
-                    num_boost_round=<best round of xgb.cv from above>,
+                    num_boost_round=1,
                     feval=xg_eval_mae)
 
 pred_y_gblinear = np.exp(xgb_model.predict(

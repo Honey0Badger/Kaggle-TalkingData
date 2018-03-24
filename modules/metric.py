@@ -2,6 +2,9 @@ from sklearn import metrics
 from sklearn.metrics import mean_absolute_error
 from keras import backend as K
 
+import numpy as np
+
+
 def log_mae(labels, preds, lift=200):
     return mean_absolute_error(np.exp(labels) - lift, np.exp(preds) - lift)
 
