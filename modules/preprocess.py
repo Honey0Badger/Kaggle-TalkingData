@@ -1,3 +1,5 @@
+
+
 import xgboost as xgb
 
 from scipy import sparse
@@ -5,6 +7,7 @@ from sklearn.model_selection import train_test_split
 from scipy.stats import skew, boxcox
 from sklearn import preprocessing
 
+import gc
 import pandas as pd
 import random
 import numpy as np
@@ -12,18 +15,16 @@ import matplotlib.pyplot as plt
 import math
 
 
-def loadData_from_file(train_file, test_file):
-        train_data = pd.read_csv(train_file)
-        print ("Loading train data finished...")
-        test_data = pd.read_csv(test_file)
-        print ("Loading test data finished...")
-        return train_data, test_data
+def load_from_file(filepath):
+        data = pd.read_csv(filepath)
+        print ("Loading data finished...")
+        return data
 
-
-def merge_train_test(train_data, test_data):
-        full_data=pd.concat([train_data, test_data])
-        print ("Full Data set created.")
-        return full_data
+def sample_inputs(infile, outfile):
+        data = pd.read_csv(infile)
+        sample = data.head(5000)
+        sample.to_csv(outfile)
+        
 
 def train_test_data(full_data, cat_cols, num_cols, train_size):
         lift = 200
@@ -45,6 +46,33 @@ def sparse_train_test_data(sparse_data, full_data,  num_cols, train_size):
         train_y = np.log(full_data[:train_size].loss.values + lift)
         return train_x, train_y, test_x
 
+def process_trainData(train):
+        train_ts = pd.to_datetime(train['click_time'])
+        train_y = train.is_attributed
+        train.drop(['click_time', 'attributed_time', 'is_attributed']
+                    , axis=1, inplace=True)
+        train = train.assign(weekday=train_ts.dt.weekday_name.values)
+        train = train.assign(hour=train_ts.dt.hour.values)
+        cat_cols = ['weekday', 'hour']
+        for cat_col in cat_cols:
+                print ("Factorize feature %s" % (cat_col))
+                train[cat_col] = preprocessing.LabelEncoder().fit_transform(train[cat_col])
+
+        return train.values, train_y.values
+        
+def process_testData(test):
+        test_ts = pd.to_datetime(test['click_time'])
+        test.drop(['click_time']
+                    , axis=1, inplace=True)
+        test = test.assign(weekday=test_ts.dt.weekday_name.values)
+        test = test.assign(hour=test_ts.dt.hour.values)
+
+        cat_cols = ['weekday', 'hour']
+        for cat_col in cat_cols:
+                print ("Factorize feature %s" % (cat_col))
+                test[cat_col] = preprocessing.LabelEncoder().fit_transform(test[cat_col])
+
+        return test.values
 
 def data_features(data):
         data_types = data.dtypes

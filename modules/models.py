@@ -1,5 +1,5 @@
 import xgboost as xgb
-from pylightgbm.models import GBMRegressor
+from pylightgbm.models import GBMRegressor, GBMClassifier
 
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Activation
@@ -11,6 +11,15 @@ from keras.optimizers import SGD,Nadam
 
 
 from metric import *
+
+### LightGBM classifier
+est_GBM_class = [GBMClassifier( learning_rate=0.01,
+                                metric = 'auc',
+                                verbose = True ),
+                 GBMClassifier( learning_rate=0.01,
+                                metric = 'auc',
+                                verbose = True )
+                ]
 
 ### LightGBM
 est_GBM_reg = [GBMRegressor( learning_rate=0.01, ## use smaller learning rate for better accuracies

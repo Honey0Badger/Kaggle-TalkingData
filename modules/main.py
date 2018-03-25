@@ -14,44 +14,43 @@ from pipelines import *
 
 
 
-
-
-
 start = time.time()
 
-train_file = '../input/train_cut.csv'
-test_file = '../input/test_cut.csv'
+train_file = '../input/train_small.csv'
+test_file = '../input/test_small.csv'
 
-train_data, test_data = loadData_from_file(train_file, test_file)
+#sample_inputs(train_file, '../input/train_small.csv')
+#sample_inputs(test_file, '../input/test_small.csv')
+#print("finish writing")
+
+
+train_data = load_from_file(train_file)
 train_size=train_data.shape[0]
+print("train data size: ", train_size)
+
+train_x, train_y = process_trainData(train_data)
+#del train_data
+#gc.collect()
+
+test_data = load_from_file(test_file)
 test_size=test_data.shape[0]
-
-full_data = merge_train_test(train_data, test_data)
-del( train_data, test_data)
-print ("Full Data set created.")
-
-id_col, target_col, cat_cols, num_cols = data_features(full_data)
+print("test data size: ", test_size)
+test_x = process_testData(test_data)
 print ("feature extracted.")
 
-full_data = category_encoding(full_data, cat_cols)
-data_sparse = one_hot_encoding(full_data, cat_cols)
-
-full_data = process_num_data(full_data, num_cols)
-
-
-train_x, train_y, test_x = train_test_data(full_data, cat_cols, num_cols, train_size)
 
 # lightgbm blend
 (train_blend_x_gbm_le,
  test_blend_x_gbm_le,
  blend_scores_gbm_le,
- best_rounds_gbm_le) = gbm_blend(est_GBM_reg, train_x, train_y, test_x, 2, 10)
+ best_rounds_gbm_le) = gbm_blend(est_GBM_class, train_x, train_y, test_x, 2, 10)
 
 print (np.mean(blend_scores_gbm_le,axis=0))
 print (np.mean(best_rounds_gbm_le,axis=0))
-np.savetxt("../input/train_blend_x_gbm_le.csv",train_blend_x_gbm_le, delimiter=",")
-np.savetxt("../input/test_blend_x_gbm_le.csv",test_blend_x_gbm_le, delimiter=",")
+np.savetxt("../input/train_blend_y_gbm_le.csv",train_blend_x_gbm_le, delimiter=",")
+np.savetxt("../input/test_blend_y_gbm_le.csv",test_blend_x_gbm_le, delimiter=",")
 
+"""
 # XGB blend
 (train_blend_x_xgb_le,
  test_blend_x_xgb_le,
@@ -141,4 +140,6 @@ results['loss'] = pred_y
 results.to_csv("../output/sub_final.csv", index=False)
 
 endtime = time.time()
-print ("Submission created.")
+print ("Submission created.") 
+"""
+

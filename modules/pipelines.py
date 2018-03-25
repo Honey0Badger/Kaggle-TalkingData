@@ -1,10 +1,10 @@
-
+from sklearn.metrics import roc_auc_score
 from sklearn import  model_selection
 from sklearn.model_selection import StratifiedKFold, KFold
 from sklearn.model_selection import GridSearchCV
 from sklearn.linear_model import ElasticNet, Ridge, LinearRegression
 
-from pylightgbm.models import GBMRegressor
+from pylightgbm.models import GBMClassifier
 
 from keras.callbacks import EarlyStopping, ModelCheckpoint
 
@@ -115,23 +115,21 @@ def xgb_blend(estimators, train_x, train_y, test_x, fold, early_stopping_rounds=
 ## LightGBM blending function
 def gbm_blend(estimators, train_x, train_y, test_x, fold, early_stopping_rounds=0):
     print("Blend %d estimators for %d folds" % (len(estimators), fold))
-    skf  = list(KFold(fold).split(train_y))
+    skf  = list(KFold(fold).split(train_x))
 
-    train_blend_x = np.zeros((train_x.shape[0], len(estimators)))
-    test_blend_x = np.zeros((test_x.shape[0], len(estimators)))
+    train_blend_y = np.zeros((train_x.shape[0], len(estimators)))
+    test_blend_y = np.zeros((test_x.shape[0], len(estimators)))
     scores = np.zeros((len(skf), len(estimators)))
     best_rounds = np.zeros((len(skf), len(estimators)))
 
     for j, gbm_est in enumerate(estimators):
         print("Model %d: %s" % (j + 1, gbm_est))
-        test_blend_x_j = np.zeros((test_x.shape[0], len(skf)))
+        test_blend_y_j = np.zeros((test_x.shape[0], len(skf)))
         params = gbm_est.get_params()
         for i, (train, val) in enumerate(skf):
             print("Model %d fold %d" % (j + 1, i + 1))
-            est = GBMRegressor()
+            est = GBMClassifier()
             est.param = params
-            #             est.exec_path='/users/cchen1/library/LightGBM/lightgbm'
-            est.exec_path = '/Users/Jianhua/anaconda/lightgbm'
             print(est)
             fold_start = time.time()
             train_x_fold = train_x[train]
@@ -142,12 +140,13 @@ def gbm_blend(estimators, train_x, train_y, test_x, fold, early_stopping_rounds=
                 est.fit(train_x_fold, train_y_fold)
                 best_rounds[i, j] = est.num_iterations
                 val_y_predict_fold = est.predict(val_x_fold)
-                score = log_mae(val_y_fold, val_y_predict_fold, 200)
-                print("Score: ", score, mean_absolute_error(val_y_fold, val_y_predict_fold))
+                score = roc_auc_score(val_y_fold, val_y_predict_fold)
+                print("Score: ", score)
                 scores[i, j] = score
-                train_blend_x[val, j] = val_y_predict_fold
-                test_blend_x_j[:, i] = est.predict(test_x)
-                print("Model %d fold %d fitting finished in %0.3fs" % (j + 1, i + 1, time.time() - fold_start))
+                train_blend_y[val, j] = val_y_predict_fold
+                test_blend_y_j[:, i] = est.predict(test_x)
+                print("Model %d fold %d fitting finished in %0.3fs" 
+                        % (j + 1, i + 1, time.time() - fold_start))
             else:  # early stopping
                 est.set_params(num_iterations=1000000)
                 est.set_params(early_stopping_round=early_stopping_rounds)
@@ -160,17 +159,18 @@ def gbm_blend(estimators, train_x, train_y, test_x, fold, early_stopping_rounds=
                 best_rounds[i, j] = best_round
                 print("best round %d" % (best_round))
                 val_y_predict_fold = est.predict(val_x_fold)
-                score = log_mae(val_y_fold, val_y_predict_fold, 200)
-                print("Score: ", score, mean_absolute_error(val_y_fold, val_y_predict_fold))
+                score = roc_auc_score(val_y_fold, val_y_predict_fold)
+                print("Score: ", score)
                 scores[i, j] = score
-                train_blend_x[val, j] = val_y_predict_fold
-                test_blend_x_j[:, i] = est.predict(test_x)
-                print("Model %d fold %d fitting finished in %0.3fs" % (j + 1, i + 1, time.time() - fold_start))
+                train_blend_y[val, j] = val_y_predict_fold
+                test_blend_y_j[:, i] = est.predict(test_x)
+                print("Model %d fold %d fitting finished in %0.3fs" 
+                        % (j + 1, i + 1, time.time() - fold_start))
 
-        test_blend_x[:, j] = test_blend_x_j.mean(1)
+        test_blend_y[:, j] = test_blend_y_j.mean(1)
         print("Score for model %d is %f" % (j + 1, np.mean(scores[:, j])))
     print("Score for blended models is %f" % (np.mean(scores)))
-    return (train_blend_x, test_blend_x, scores, best_rounds)
+    return (train_blend_y, test_blend_y, scores, best_rounds)
 
 
 def nn_blend_data(train_x, train_y, test_x, fold, early_stopping_rounds=0, batch_size=128):
