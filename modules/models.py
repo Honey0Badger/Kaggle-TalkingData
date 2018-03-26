@@ -1,5 +1,5 @@
 import xgboost as xgb
-from pylightgbm.models import GBMRegressor, GBMClassifier
+from pylightgbm.models import GBMClassifier
 
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Activation
@@ -13,32 +13,29 @@ from keras.optimizers import SGD,Nadam
 from metric import *
 
 ### LightGBM classifier
-est_GBM_class = [GBMClassifier( learning_rate=0.01,
-                                metric = 'auc',
+est_GBM_class = [GBMClassifier( learning_rate=0.1,
+                                metric='auc',
+                                num_leaves=7,
+                                max_depth=3,
+                                max_bin=100,
+                                min_data_in_leaf=100,    # min_child_samples in lgb
+                                bagging_freq=1,          # subsample_freq 
+                                bagging_fraction=0.7,    # subsample
+                                feature_fraction=0.7,
+                                is_unbalance=True,
                                 verbose = True ),
-                 GBMClassifier( learning_rate=0.01,
+                 GBMClassifier( learning_rate=0.1,
                                 metric = 'auc',
+                                num_leaves=7,
+                                max_depth=8,
+                                max_bin=100,
+                                min_data_in_leaf=100,
+                                bagging_freq=1,
+                                bagging_fraction=0.7,
+                                is_unbalance=True,
                                 verbose = True )
                 ]
 
-### LightGBM
-est_GBM_reg = [GBMRegressor( learning_rate=0.01, ## use smaller learning rate for better accuracies
-                     num_iterations=100,
-                     bagging_freq=1,
-                     verbose = True),
-              GBMRegressor( learning_rate=0.01, 
-                     num_iterations=100,
-                     bagging_freq=1,
-                     verbose = True),
-              GBMRegressor( learning_rate=0.01,
-                     num_iterations=100,
-                     bagging_freq=1,
-                     verbose = True),
-              GBMRegressor( learning_rate=0.01, 
-                     num_iterations=100,
-                     bagging_freq=1,
-                     verbose = True)
-        ]
 
 ## LE + XGBoost
 est_XGB_reg = [xgb.XGBRegressor(objective=logregobj,

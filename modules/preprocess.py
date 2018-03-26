@@ -1,5 +1,3 @@
-
-
 import xgboost as xgb
 
 from scipy import sparse
@@ -49,28 +47,25 @@ def sparse_train_test_data(sparse_data, full_data,  num_cols, train_size):
 def process_trainData(train):
         train_ts = pd.to_datetime(train['click_time'])
         train_y = train.is_attributed
-        train.drop(['click_time', 'attributed_time', 'is_attributed']
+        train = train.drop(['click_time', 'attributed_time', 'is_attributed']
                     , axis=1, inplace=True)
-        train = train.assign(weekday=train_ts.dt.weekday_name.values)
-        train = train.assign(hour=train_ts.dt.hour.values)
-        cat_cols = ['weekday', 'hour']
-        for cat_col in cat_cols:
-                print ("Factorize feature %s" % (cat_col))
-                train[cat_col] = preprocessing.LabelEncoder().fit_transform(train[cat_col])
+        gc.collect()
+        train = train.assign(weekday=train_ts.dt.day.astype('uint8'))
+        train = train.assign(hour=train_ts.dt.hour.astype('uint8'))
+        del train_ts
+        gc.collect()
 
         return train.values, train_y.values
         
 def process_testData(test):
         test_ts = pd.to_datetime(test['click_time'])
-        test.drop(['click_time']
+        test = test.drop(['click_time']
                     , axis=1, inplace=True)
-        test = test.assign(weekday=test_ts.dt.weekday_name.values)
-        test = test.assign(hour=test_ts.dt.hour.values)
-
-        cat_cols = ['weekday', 'hour']
-        for cat_col in cat_cols:
-                print ("Factorize feature %s" % (cat_col))
-                test[cat_col] = preprocessing.LabelEncoder().fit_transform(test[cat_col])
+        gc.collect()
+        test = test.assign(weekday=test_ts.dt.day.astype('uint8'))
+        test = test.assign(hour=test_ts.dt.hour.astype('uint8'))
+        del test_ts
+        gc.collect()
 
         return test.values
 

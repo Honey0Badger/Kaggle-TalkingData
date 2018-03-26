@@ -141,7 +141,7 @@ def gbm_blend(estimators, train_x, train_y, test_x, fold, early_stopping_rounds=
                 best_rounds[i, j] = est.num_iterations
                 val_y_predict_fold = est.predict(val_x_fold)
                 score = roc_auc_score(val_y_fold, val_y_predict_fold)
-                print("Score: ", score)
+                print("AUC score: ", score)
                 scores[i, j] = score
                 train_blend_y[val, j] = val_y_predict_fold
                 test_blend_y_j[:, i] = est.predict(test_x)
@@ -160,7 +160,7 @@ def gbm_blend(estimators, train_x, train_y, test_x, fold, early_stopping_rounds=
                 print("best round %d" % (best_round))
                 val_y_predict_fold = est.predict(val_x_fold)
                 score = roc_auc_score(val_y_fold, val_y_predict_fold)
-                print("Score: ", score)
+                print("AUC score: ", score)
                 scores[i, j] = score
                 train_blend_y[val, j] = val_y_predict_fold
                 test_blend_y_j[:, i] = est.predict(test_x)

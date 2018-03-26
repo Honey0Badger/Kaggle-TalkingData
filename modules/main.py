@@ -1,3 +1,4 @@
+import os
 import time
 import random
 import numpy as np
@@ -13,11 +14,11 @@ from preprocess import *
 from pipelines import *
 
 
-
+os.environ['LIGHTGBM_EXEC'] = "/opt/LightGBM/lightgbm"
 start = time.time()
 
-train_file = '../input/train_small.csv'
-test_file = '../input/test_small.csv'
+train_file = '../input/train.csv'
+test_file = '../input/test.csv'
 
 #sample_inputs(train_file, '../input/train_small.csv')
 #sample_inputs(test_file, '../input/test_small.csv')
@@ -29,8 +30,9 @@ train_size=train_data.shape[0]
 print("train data size: ", train_size)
 
 train_x, train_y = process_trainData(train_data)
-#del train_data
-#gc.collect()
+
+del train_data
+gc.collect()
 
 test_data = load_from_file(test_file)
 test_size=test_data.shape[0]
@@ -38,18 +40,24 @@ print("test data size: ", test_size)
 test_x = process_testData(test_data)
 print ("feature extracted.")
 
+del test_data
+gc.collect()
 
 # lightgbm blend
-(train_blend_x_gbm_le,
- test_blend_x_gbm_le,
+(train_blend_y_gbm_le,
+ test_blend_y_gbm_le,
  blend_scores_gbm_le,
  best_rounds_gbm_le) = gbm_blend(est_GBM_class, train_x, train_y, test_x, 2, 10)
 
 print (np.mean(blend_scores_gbm_le,axis=0))
 print (np.mean(best_rounds_gbm_le,axis=0))
-np.savetxt("../input/train_blend_y_gbm_le.csv",train_blend_x_gbm_le, delimiter=",")
-np.savetxt("../input/test_blend_y_gbm_le.csv",test_blend_x_gbm_le, delimiter=",")
+#np.savetxt("../output/train_blend_y_gbm_le.csv",train_blend_y_gbm_le, delimiter=",")
+np.savetxt("../output/test_blend_y_gbm_le.csv",test_blend_y_gbm_le, delimiter=",")
 
+
+submission = pd.DataFrame()
+submission['is_attributed'] = np.mean(test_blend_y_gbm_le, axis=1)
+submission.to_csv("../output/sub_final.csv", index=False)
 """
 # XGB blend
 (train_blend_x_xgb_le,

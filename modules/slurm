@@ -1,0 +1,17 @@
+#!/bin/bash
+### job name
+#SBATCH --job-name=gbm_ML
+#SBATCH --time=20:00:00
+#SBATCH -p gpu
+#SBATCH --gres=gpu:k80
+### set output files
+#SBATCH -e errfile
+#SBATCH --output=outputfile 
+#SBATCH -A ghosh_yunkun
+#SBATCH --mem=30000
+
+module load singularity
+module load tensorflow/1.6.0-py36
+
+# run application
+singularity-gpu exec /scratch/yx3ga/tensorflow-1.6.0-py36.simg python main.py
