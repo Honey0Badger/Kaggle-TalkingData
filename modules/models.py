@@ -36,6 +36,15 @@ est_GBM_class = [GBMClassifier( learning_rate=0.1,
                                 verbose = True )
                 ]
 
+est_GBM_class_basic = [GBMClassifier( learning_rate=0.1,
+                                metric='auc',
+                                is_unbalance=True,
+                                verbose = True ),
+                 GBMClassifier( learning_rate=0.1,
+                                metric = 'auc',
+                                is_unbalance=True,
+                                verbose = True )
+                ]
 
 ## LE + XGBoost
 est_XGB_reg = [xgb.XGBRegressor(objective=logregobj,
