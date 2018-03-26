@@ -18,6 +18,11 @@ def load_from_file(filepath):
         print ("Loading data finished...")
         return data
 
+def load_half_file(filepath):
+        data = pd.read_csv(filepath, nrows=500000)
+        print ("Loading data finished...")
+        return data
+
 def sample_inputs(infile, outfile):
         data = pd.read_csv(infile)
         sample = data.head(5000)
@@ -47,7 +52,7 @@ def sparse_train_test_data(sparse_data, full_data,  num_cols, train_size):
 def process_trainData(train):
         train_ts = pd.to_datetime(train['click_time'])
         train_y = train.is_attributed
-        train = train.drop(['click_time', 'attributed_time', 'is_attributed']
+        train.drop(['click_time', 'attributed_time', 'is_attributed']
                     , axis=1, inplace=True)
         gc.collect()
         train = train.assign(weekday=train_ts.dt.day.astype('uint8'))
@@ -59,7 +64,7 @@ def process_trainData(train):
         
 def process_testData(test):
         test_ts = pd.to_datetime(test['click_time'])
-        test = test.drop(['click_time']
+        test.drop(['click_time']
                     , axis=1, inplace=True)
         gc.collect()
         test = test.assign(weekday=test_ts.dt.day.astype('uint8'))

@@ -17,8 +17,8 @@ from pipelines import *
 os.environ['LIGHTGBM_EXEC'] = "/opt/LightGBM/lightgbm"
 start = time.time()
 
-train_file = '../input/train.csv'
-test_file = '../input/test.csv'
+train_file = '../input/train_small.csv'
+test_file = '../input/test_small.csv'
 
 #sample_inputs(train_file, '../input/train_small.csv')
 #sample_inputs(test_file, '../input/test_small.csv')
@@ -26,6 +26,7 @@ test_file = '../input/test.csv'
 
 
 train_data = load_from_file(train_file)
+#train_data = load_half_file(train_file)
 train_size=train_data.shape[0]
 print("train data size: ", train_size)
 
