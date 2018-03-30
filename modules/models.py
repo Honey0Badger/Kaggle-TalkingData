@@ -1,50 +1,37 @@
 import xgboost as xgb
-from pylightgbm.models import GBMClassifier
+import lightgbm as lgb
 
-from keras.models import Sequential
-from keras.layers import Dense, Dropout, Activation
-from keras.layers.normalization import BatchNormalization
-from keras.layers.advanced_activations import PReLU
-from keras.callbacks import EarlyStopping, ModelCheckpoint
-from keras import backend as K
-from keras.optimizers import SGD,Nadam
-
+#from keras.models import Sequential
+#from keras.layers import Dense, Dropout, Activation
+#from keras.layers.normalization import BatchNormalization
+#from keras.layers.advanced_activations import PReLU
+#from keras.callbacks import EarlyStopping, ModelCheckpoint
+#from keras import backend as K
+#from keras.optimizers import SGD,Nadam
 
 from metric import *
 
-### LightGBM classifier
-est_GBM_class = [GBMClassifier( learning_rate=0.1,
-                                metric='auc',
-                                num_leaves=7,
-                                max_depth=3,
-                                max_bin=100,
-                                min_data_in_leaf=100,    # min_child_samples in lgb
-                                bagging_freq=1,          # subsample_freq 
-                                bagging_fraction=0.7,    # subsample
-                                feature_fraction=0.7,
-                                is_unbalance=True,
-                                verbose = True ),
-                 GBMClassifier( learning_rate=0.1,
-                                metric = 'auc',
-                                num_leaves=7,
-                                max_depth=8,
-                                max_bin=100,
-                                min_data_in_leaf=100,
-                                bagging_freq=1,
-                                bagging_fraction=0.7,
-                                is_unbalance=True,
-                                verbose = True )
-                ]
 
-est_GBM_class_basic = [GBMClassifier( learning_rate=0.1,
-                                metric='auc',
-                                is_unbalance=True,
-                                verbose = True ),
-                 GBMClassifier( learning_rate=0.1,
-                                metric = 'auc',
-                                is_unbalance=True,
-                                verbose = True )
-                ]
+estimators_LGBM = [lgb.LGBMClassifier( learning_rate=0.01,
+                                       boosting_type='gbdt',
+                                       objective='binary',
+                                       num_leaves=31,
+                                       max_depth=-1,
+                                       max_bin=255,
+                                       min_child_samples=20,    # min_child_samples in lgb
+                                       subsample=0.6,
+                                       subsample_freq=0,
+                                       colsample_bytree=0.3,
+                                       min_child_weight=5,
+                                       subsample_for_bin=200000,
+                                       is_unbalance=True,
+                                       verbose = 0 ),
+                   lgb.LGBMClassifier( learning_rate=0.01,
+                                       objective='binary',
+                                       is_unbalance=True,
+                                       verbose = 0 )
+                   ]
+
 
 ## LE + XGBoost
 est_XGB_reg = [xgb.XGBRegressor(objective=logregobj,
@@ -76,7 +63,7 @@ est_XGB_reg = [xgb.XGBRegressor(objective=logregobj,
                                silent = True,
                                seed = 1234)
               ]
-
+"""
 # NN model
 def nn_model(params):
     model = Sequential()
@@ -97,3 +84,4 @@ def nn_model(params):
     model.add(Dense(1))
     model.compile(loss='mae', metrics=[mae_log], optimizer=params['optimizer'])
     return (model)
+"""

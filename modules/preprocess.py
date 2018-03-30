@@ -19,35 +19,15 @@ def load_from_file(filepath):
         return data
 
 def load_half_file(filepath):
-        data = pd.read_csv(filepath, nrows=500000)
+        data = pd.read_csv(filepath, nrows=75000000)
         print ("Loading data finished...")
         return data
 
 def sample_inputs(infile, outfile):
         data = pd.read_csv(infile)
         sample = data.head(5000)
-        sample.to_csv(outfile)
-        
+        sample.to_csv(outfile, index=False)
 
-def train_test_data(full_data, cat_cols, num_cols, train_size):
-        lift = 200
-        full_cols = num_cols + cat_cols
-        train_x = full_data[full_cols][:train_size].values
-        test_x = full_data[full_cols][train_size:].values
-        train_y = np.log(full_data[:train_size].loss.values + lift)
-        ID = full_data.id[:train_size].values
-        return train_x, train_y, test_x
-
-def sparse_train_test_data(sparse_data, full_data,  num_cols, train_size):
-        lift = 200
-        full_data_sparse = sparse.hstack((sparse_data
-                                         ,full_data[num_cols])
-                                         ,format='csr'
-                                        )
-        train_x = sparse_data[:train_size]
-        test_x = sparse_data[train_size:]
-        train_y = np.log(full_data[:train_size].loss.values + lift)
-        return train_x, train_y, test_x
 
 def process_trainData(train):
         train_ts = pd.to_datetime(train['click_time'])
@@ -59,12 +39,11 @@ def process_trainData(train):
         train = train.assign(hour=train_ts.dt.hour.astype('uint8'))
         del train_ts
         gc.collect()
-
         return train.values, train_y.values
         
 def process_testData(test):
         test_ts = pd.to_datetime(test['click_time'])
-        test.drop(['click_time']
+        test.drop(['click_id', 'click_time']
                     , axis=1, inplace=True)
         gc.collect()
         test = test.assign(weekday=test_ts.dt.day.astype('uint8'))

@@ -5,7 +5,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import math
 
-import tensorflow as tf
 import pandas as pd
 
 from preprocess import *
@@ -13,47 +12,44 @@ from models import *
 from preprocess import *
 from pipelines import *
 
-
-os.environ['LIGHTGBM_EXEC'] = "/opt/LightGBM/lightgbm"
 start = time.time()
 
-train_file = '../input/train_small.csv'
-test_file = '../input/test_small.csv'
+train_file = '../input/train.csv'
+test_file = '../input/test.csv'
 
+## create a small sample for testing
 #sample_inputs(train_file, '../input/train_small.csv')
 #sample_inputs(test_file, '../input/test_small.csv')
 #print("finish writing")
-
+#exit()
 
 train_data = load_from_file(train_file)
 #train_data = load_half_file(train_file)
-train_size=train_data.shape[0]
-print("train data size: ", train_size)
+train_size=train_data.shape
 
 train_x, train_y = process_trainData(train_data)
+print("train data size: ", train_size)
 
 del train_data
 gc.collect()
 
 test_data = load_from_file(test_file)
-test_size=test_data.shape[0]
-print("test data size: ", test_size)
+Id = test_data['click_id'].values
+test_size=test_data.shape
 test_x = process_testData(test_data)
 print ("feature extracted.")
-Id = test_data['click_id'].values
+print("test data size: ", test_size)
 
 del test_data
 gc.collect()
 
 # lightgbm blend
-(train_blend_y_gbm_le,
- test_blend_y_gbm_le,
+(test_blend_y_gbm_le,
  blend_scores_gbm_le,
- best_rounds_gbm_le) = gbm_blend(est_GBM_class_basic, train_x, train_y, test_x, 2, 10)
+ best_rounds_gbm_le) = lgbm_blend(estimators_LGBM, train_x, train_y, test_x, 2, 20)
 
 print (np.mean(blend_scores_gbm_le,axis=0))
 print (np.mean(best_rounds_gbm_le,axis=0))
-#np.savetxt("../output/train_blend_y_gbm_le.csv",train_blend_y_gbm_le, delimiter=",")
 np.savetxt("../output/test_blend_y_gbm_le.csv",test_blend_y_gbm_le, delimiter=",")
 
 
