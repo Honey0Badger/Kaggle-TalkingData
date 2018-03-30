@@ -67,19 +67,19 @@ def lgbm_blend(estimators, train_x, train_y, test_x, fold, early_stopping_rounds
 
     for j, est in enumerate(estimators):
         print("Model %d: %s" % (j + 1, est))
-        test_blend_y_j = np.zeros((test_x.shape[0], len(skf)))
+        test_blend_y_j = np.zeros((test_x.shape[0],))
         for i, (train, val) in enumerate(skf):
             print("Model %d fold %d" % (j + 1, i + 1))
             fold_start = time.time()
             if early_stopping_rounds == 0:  # without early stopping
                 est.fit(train_x[train], train_y[train], eval_metric='auc')
                 best_rounds[i, j] = -1
-                val_y_predict_fold = est.predict_proba(train_x[val])
+                val_y_predict_fold = est.predict_proba(train_x[val])[:,1]
                 score = roc_auc_score(train_y[val], val_y_predict_fold)
                 del val_y_predict_fold
                 print("AUC score: ", score)
                 scores[i, j] = score
-                test_blend_y_j[:, i] = est.predict(test_x)
+                test_blend_y_j = test_blend_y_j + est.predict_proba(test_x)[:,1]
                 print("Model %d fold %d fitting finished in %0.3fs" 
                         % (j + 1, i + 1, time.time() - fold_start))
             else:  # early stopping
@@ -99,12 +99,12 @@ def lgbm_blend(estimators, train_x, train_y, test_x, fold, early_stopping_rounds
                 del val_y_predict_fold
                 print("AUC score: ", score)
                 scores[i, j] = score
-                test_blend_y_j[:, i] = est.predict(test_x)
+                test_blend_y_j = test_blend_y_j + est.predict_proba(test_x)[:,1]
                 print("Model %d fold %d fitting finished in %0.3fs" 
                         % (j + 1, i + 1, time.time() - fold_start))
             gc.collect()
+            test_blend_y[:, j] = test_blend_y_j
 
-        test_blend_y[:, j] = test_blend_y_j.mean(1)
         print("Score for model %d is %f" % (j + 1, np.mean(scores[:, j])))
     print("Score for blended models is %f" % (np.mean(scores)))
     return (test_blend_y, scores, best_rounds)

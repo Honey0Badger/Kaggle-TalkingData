@@ -46,7 +46,7 @@ gc.collect()
 # lightgbm blend
 (test_blend_y_gbm_le,
  blend_scores_gbm_le,
- best_rounds_gbm_le) = lgbm_blend(estimators_LGBM, train_x, train_y, test_x, 2, 20)
+ best_rounds_gbm_le) = lgbm_blend(estimators_LGBM, train_x, train_y, test_x, 4, 30)
 
 print (np.mean(blend_scores_gbm_le,axis=0))
 print (np.mean(best_rounds_gbm_le,axis=0))
