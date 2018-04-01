@@ -21,7 +21,7 @@ def search_model(train_x, train_y, est, param_grid, n_jobs, cv, refit=False):
     ##Grid Search for the best model
     model = GridSearchCV(estimator=est,
                          param_grid=param_grid,
-                         scoring=log_mae_scorer,
+                         scoring='roc_auc',
                          verbose=10,
                          n_jobs=n_jobs,
                          iid=True,
@@ -31,27 +31,10 @@ def search_model(train_x, train_y, est, param_grid, n_jobs, cv, refit=False):
     model.fit(train_x, train_y)
     print("Best score: %0.3f" % model.best_score_)
     print("Best parameters set:", model.best_params_)
-    print("Scores:", model.grid_scores_)
-    return model
+    print("**********************************************")
+#    print("All scores: ")
+#    print(model.cv_results_)
 
-
-
-
-def search_model_mae(train_x, train_y, est, param_grid, n_jobs, cv, refit=False):
-    ##Grid Search for the best model
-    model = GridSearchCV(estimator=est,
-                         param_grid=param_grid,
-                         scoring='neg_mean_absolute_error',
-                         verbose=10,
-                         n_jobs=n_jobs,
-                         iid=True,
-                         refit=refit,
-                         cv=cv)
-    # Fit Grid Search Model
-    model.fit(train_x, train_y)
-    print("Best score: %0.3f" % model.best_score_)
-    print("Best parameters set:", model.best_params_)
-    print("Scores:", model.cv_results_)
     return model
 
 
@@ -103,7 +86,7 @@ def lgbm_blend(estimators, train_x, train_y, test_x, fold, early_stopping_rounds
                 print("Model %d fold %d fitting finished in %0.3fs" 
                         % (j + 1, i + 1, time.time() - fold_start))
             gc.collect()
-            test_blend_y[:, j] = test_blend_y_j
+            test_blend_y[:, j] = test_blend_y_j / fold
 
         print("Score for model %d is %f" % (j + 1, np.mean(scores[:, j])))
     print("Score for blended models is %f" % (np.mean(scores)))
