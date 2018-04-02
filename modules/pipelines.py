@@ -32,8 +32,8 @@ def search_model(train_x, train_y, est, param_grid, n_jobs, cv, refit=False):
     print("Best score: %0.3f" % model.best_score_)
     print("Best parameters set:", model.best_params_)
     print("**********************************************")
-#    print("All scores: ")
-#    print(model.cv_results_)
+    # saving all model scores
+    np.savez('../output/grid_model_scores.npz', model.cv_results_)
 
     return model
 

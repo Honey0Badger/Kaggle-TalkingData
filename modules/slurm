@@ -14,4 +14,4 @@ module load singularity
 module load tensorflow/1.6.0-py36
 
 # run application
-singularity-gpu exec /scratch/yx3ga/tensorflow-1.6.0-py36.simg python main.py >& out
+singularity-gpu exec /scratch/yx3ga/tensorflow-1.6.0-py36.simg python main.py 

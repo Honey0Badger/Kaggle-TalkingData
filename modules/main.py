@@ -25,7 +25,7 @@ test_file = '../input/test.csv'
 
 train_data = load_from_file(train_file)
 #train_data = load_half_file(train_file)
-train_size=train_data.shape
+train_size = train_data.shape
 
 train_x, train_y = process_trainData(train_data)
 print("train data size: ", train_size)
@@ -46,7 +46,7 @@ gc.collect()
 # lightgbm blend
 (test_blend_y_gbm_le,
  blend_scores_gbm_le,
- best_rounds_gbm_le) = lgbm_blend(estimators_LGBM, train_x, train_y, test_x, 4, 20)
+ best_rounds_gbm_le) = lgbm_blend(est_LGBM_test, train_x, train_y, test_x, 4, 20)
 
 del train_x, train_y, test_x
 gc.collect()
@@ -59,7 +59,7 @@ print (np.mean(best_rounds_gbm_le,axis=0))
 submission = pd.DataFrame()
 submission['is_attributed'] = np.mean(test_blend_y_gbm_le, axis=1)
 submission.insert(loc=0, column='click_id', value = Id)
-submission.to_csv("../output/sub_final.csv", index=False)
+submission.to_csv("../output/sub_final.csv", index=False, float_format='%1.5f')
 """
 # XGB blend
 (train_blend_x_xgb_le,

@@ -25,6 +25,20 @@ estimators_LGBM = [lgb.LGBMClassifier(   learning_rate=0.01
 #                                       verbose = 0 )
                    ]
 
+est_LGBM_test = [lgb.LGBMClassifier(   learning_rate=0.25
+                                       , boosting_type='gbdt'
+                                       , objective='binary'
+                                       , n_estimators=18
+                                       , num_leaves=70
+                                       , max_depth=15
+                                       , subsample=0.6
+                                       , colsample_bytree=0.3
+                                       , min_child_weight=1e-3
+                                       , min_data_in_leaf=1800
+                                       , is_unbalance=True
+                                       , verbose = 0 )
+                   ]
+
 lgbm_est_base = lgb.LGBMClassifier(   learning_rate=0.01
                                        , boosting_type='gbdt'
                                        , objective='binary'

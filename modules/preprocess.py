@@ -19,7 +19,7 @@ def load_from_file(filepath):
         return data
 
 def load_half_file(filepath):
-        data = pd.read_csv(filepath, nrows=75000000)
+        data = pd.read_csv(filepath, nrows=10000000)
         print ("Loading data finished...")
         return data
 
