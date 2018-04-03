@@ -42,7 +42,7 @@ def search_model(train_x, train_y, est, param_grid, n_jobs, cv, refit=False):
 ## LightGBM blending
 def lgbm_blend(estimators, train_x, train_y, test_x, fold, early_stopping_rounds=0):
     print("Blend %d estimators for %d folds" % (len(estimators), fold))
-    skf  = list(KFold(fold).split(train_x))
+    skf  = list(KFold(fold).split(train_y))
 
     test_blend_y = np.zeros((test_x.shape[0], len(estimators)))
     scores = np.zeros((len(skf), len(estimators)))
@@ -67,22 +67,22 @@ def lgbm_blend(estimators, train_x, train_y, test_x, fold, early_stopping_rounds
                         % (j + 1, i + 1, time.time() - fold_start))
             else:  # early stopping
                 est.set_params(num_boost_round=1000)
-                est.set_params(early_stopping_round=early_stopping_rounds)
                 est.set_params(verbose=-1)
                 est.fit(train_x[train],
                         train_y[train],
                         eval_set=[(train_x[val], train_y[val])],
                         eval_metric='auc',
+                        early_stopping_rounds = early_stopping_rounds,
                         verbose=False
                        )
-                #best_rounds[i, j] = est.best_iteration_
-                #print("best round %d" % (best_rounds[i,j]))
-                val_y_predict_fold = est.predict_proba(train_x[val])[:,1]
+                best_rounds[i, j] = est.best_iteration_
+                print("best round %d" % (best_rounds[i,j]))
+                val_y_predict_fold = est.predict_proba(train_x[val], num_iteration = est.best_iteration_)[:,1]
                 score = roc_auc_score(train_y[val], val_y_predict_fold)
                 del val_y_predict_fold
                 print("AUC score: ", score)
                 scores[i, j] = score
-                test_blend_y_j = test_blend_y_j + est.predict_proba(test_x)[:,1]
+                test_blend_y_j = test_blend_y_j + est.predict_proba(test_x, num_iteration = est.best_iteration_)[:,1]
                 print("Model %d fold %d fitting finished in %0.3fs" 
                         % (j + 1, i + 1, time.time() - fold_start))
             gc.collect()
@@ -99,55 +99,49 @@ def xgb_blend(estimators, train_x, train_y, test_x, fold, early_stopping_rounds=
     print("Blend %d estimators for %d folds" % (len(estimators), fold))
     skf  = list(KFold(fold).split(train_y))
 
-    train_blend_x = np.zeros((train_x.shape[0], len(estimators)))
-    test_blend_x = np.zeros((test_x.shape[0], len(estimators)))
+    test_blend_y = np.zeros((test_x.shape[0], len(estimators)))
     scores = np.zeros((len(skf), len(estimators)))
     best_rounds = np.zeros((len(skf), len(estimators)))
 
     for j, est in enumerate(estimators):
         print("Model %d: %s" % (j + 1, est))
-        test_blend_x_j = np.zeros((test_x.shape[0], len(skf)))
+        test_blend_y_j = np.zeros((test_x.shape[0],))
         for i, (train, val) in enumerate(skf):
             print("Model %d fold %d" % (j + 1, i + 1))
             fold_start = time.time()
-            train_x_fold = train_x[train]
-            train_y_fold = train_y[train]
-            val_x_fold = train_x[val]
-            val_y_fold = train_y[val]
             if early_stopping_rounds == 0:  # without early stopping
-                est.fit(train_x_fold, train_y_fold)
-                best_rounds[i, j] = est.n_estimators
-                val_y_predict_fold = est.predict(val_x_fold)
-                score = log_mae(val_y_fold, val_y_predict_fold, 200)
-                print("Score: ", score)
+                est.fit(train_x[train], train_y[train], eval_metric='auc')
+                best_rounds[i, j] = -1
+                val_y_predict_fold = est.predict_proba(train_x[val])[:,1]
+                score = roc_auc_score(train_y[val], val_y_predict_fold)
+                del val_y_predict_fold
+                print("AUC Score: ", score)
                 scores[i, j] = score
-                train_blend_x[val, j] = val_y_predict_fold
-                test_blend_x_j[:, i] = est.predict(test_x)
+                test_blend_y_j = test_blend_y_j + est.predict_proba(test_x)[:,1]
                 print("Model %d fold %d fitting finished in %0.3fs" % (j + 1, i + 1, time.time() - fold_start))
             else:  # early stopping
                 est.set_params(n_estimators=10000)
-                est.fit(train_x_fold,
-                        train_y_fold,
-                        eval_set=[(val_x_fold, val_y_fold)],
-                        eval_metric=xg_eval_mae,
+                est.fit(train_x[train],
+                        train_y[train],
+                        eval_set=[(train_x[val], train_y[val])],
+                        eval_metric='auc',
                         early_stopping_rounds=early_stopping_rounds,
                         verbose=False
                         )
                 best_round = est.best_iteration
                 best_rounds[i, j] = best_round
                 print("best round %d" % (best_round))
-                val_y_predict_fold = est.predict(val_x_fold, ntree_limit=best_round)
-                score = log_mae(val_y_fold, val_y_predict_fold, 200)
-                print("Score: ", score)
+                val_y_predict_fold = est.predict_proba(train_x[val], ntree_limit=best_round)[:,1]
+                score = roc_auc_score(train_y[val], val_y_predict_fold)
+                print("AUC Score: ", score)
                 scores[i, j] = score
-                train_blend_x[val, j] = val_y_predict_fold
-                test_blend_x_j[:, i] = est.predict(test_x, ntree_limit=best_round)
+                test_blend_y_j = test_blend_y_j + est.predict_proba(test_x, ntree_limit=best_round)[:,1]
                 print("Model %d fold %d fitting finished in %0.3fs" % (j + 1, i + 1, time.time() - fold_start))
 
-        test_blend_x[:, j] = test_blend_x_j.mean(1)
+        test_blend_y[:, j] = test_blend_y_j / fold
         print("Score for model %d is %f" % (j + 1, np.mean(scores[:, j])))
     print("Score for blended models is %f" % (np.mean(scores)))
-    return (train_blend_x, test_blend_x, scores, best_rounds)
+    return (test_blend_y, scores, best_rounds)
 
 
 
