@@ -86,8 +86,8 @@ def lgbm_blend(estimators, train_x, train_y, test_x, fold, early_stopping_rounds
                 print("Model %d fold %d fitting finished in %0.3fs" 
                         % (j + 1, i + 1, time.time() - fold_start))
             gc.collect()
-            test_blend_y[:, j] = test_blend_y_j / fold
 
+        test_blend_y[:, j] = test_blend_y_j / fold
         print("Score for model %d is %f" % (j + 1, np.mean(scores[:, j])))
     print("Score for blended models is %f" % (np.mean(scores)))
     return (test_blend_y, scores, best_rounds)
@@ -134,10 +134,12 @@ def xgb_blend(estimators, train_x, train_y, test_x, fold, early_stopping_rounds=
                 val_y_predict_fold = est.predict_proba(train_x[val], ntree_limit=best_round)[:,1]
                 score = roc_auc_score(train_y[val], val_y_predict_fold)
                 print("AUC Score: ", score)
+                del val_y_predict_fold
                 scores[i, j] = score
                 test_blend_y_j = test_blend_y_j + est.predict_proba(test_x, ntree_limit=best_round)[:,1]
                 print("Model %d fold %d fitting finished in %0.3fs" % (j + 1, i + 1, time.time() - fold_start))
-
+            gc.collect()
+            
         test_blend_y[:, j] = test_blend_y_j / fold
         print("Score for model %d is %f" % (j + 1, np.mean(scores[:, j])))
     print("Score for blended models is %f" % (np.mean(scores)))
