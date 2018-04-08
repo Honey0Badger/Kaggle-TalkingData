@@ -42,14 +42,6 @@ est_LGBM_test = [lgb.LGBMClassifier(   learning_rate=0.25
 lgbm_est_base = lgb.LGBMClassifier(   learning_rate=0.01
                                        , boosting_type='gbdt'
                                        , objective='binary'
-                                       , num_leaves=31
-                                       , max_depth=-1
-                                       , max_bin=255
-                                       , min_child_samples=20    # min_child_samples in lgb
-                                       , subsample=0.6
-                                       , subsample_freq=0
-                                       , colsample_bytree=0.3
-                                       , min_child_weight=5
                                        #, subsample_for_bin=200000
                                        , is_unbalance=True
                                        , verbose = 0 )
@@ -71,8 +63,9 @@ est_XGB_class = [xgb.XGBClassifier(  objective='binary:logistic'
                                     , eval_metric = 'auc'
                                     , random_state = 9
                                     , silent = True
+                                    #, n_jobs = 4
                                     #, learning_rate=0.01
-                                    #, n_estimators=100
+                                    , n_estimators=10
                                     #, seed = 1234
                                     )
 #                , xgb.XGBClassifier( objective='binary',
@@ -81,3 +74,8 @@ est_XGB_class = [xgb.XGBClassifier(  objective='binary:logistic'
 #                                    , seed = 1234
 #                                    )
                 ]
+est_XGB_base = xgb.XGBClassifier( objective='binary:logistic'
+                                 , tree_method='hist'
+                                 , grow_policy='lossguide'
+                                 , eval_metric='auc'
+                                )

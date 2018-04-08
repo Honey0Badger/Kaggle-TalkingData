@@ -16,6 +16,7 @@ from pipelines import *
 now = datetime.datetime.now()
 print("Print timestamp for record...")
 print(now.strftime("%Y-%m-%d %H:%M"))
+sys.stdout.flush()
 
 start = time.time()
 
@@ -35,6 +36,7 @@ train_data.info()
 
 train_x, train_y = process_trainData(train_data)
 print("train data size: ", train_size)
+sys.stdout.flush()
 
 del train_data
 gc.collect()
@@ -46,6 +48,7 @@ test_x = process_testData(test_data)
 print ("feature extracted.")
 print("test data size: ", test_size)
 test_data.info()
+sys.stdout.flush()
 
 del test_data
 gc.collect()
@@ -58,13 +61,14 @@ gc.collect()
 # xgboost blend
 (test_blend_y_xgb_le,
  blend_scores_xgb_le,
- best_rounds_xgb_le) = xgb_blend(est_XGB_class, train_x, train_y, test_x, 4, 20)
+ best_rounds_xgb_le) = xgb_blend(est_XGB_class, train_x, train_y, test_x, 2, 0)
 
 del train_x, train_y, test_x
 gc.collect()
 
 print (np.mean(blend_scores_xgb_le,axis=0))
 print (np.mean(best_rounds_xgb_le,axis=0))
+sys.stdout.flush()
 #np.savetxt("../output/test_blend_y_gbm_le.csv",test_blend_y_gbm_le, delimiter=",")
 
 

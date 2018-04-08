@@ -14,7 +14,7 @@ from pipelines import *
 
 start = time.time()
 
-train_file = '../input/train_Attributed_Sample.csv'
+train_file = '../input/train_CV_sample.csv'
 
 
 #train_data = load_from_file(train_file)
@@ -28,22 +28,33 @@ del train_data
 gc.collect()
 
 gridParams = {
-         'learning_rate': [0.25]
-         ,'n_estimators': [18]
-         ,'max_depth': [15]
-         ,'min_child_weight': [1e-3]
-         ,'min_data_in_leaf': [1800]
-         ,'num_leaves': [70]
-         ,'random_state': [501]
-         ,'colsample_bytree': [0.3]
-         ,'subsample': [0.6]
-         ,'is_unbalance': [True]
+         #'learning_rate': [0.05]
+         'n_estimators': [16, 18, 20, 22, 24, 26]
+         #,'max_depth': [15]
+         #,'min_child_weight': [1e-3, 5e-3, 1e-2, 5e-2]
+         #,'min_data_in_leaf': [1800]
+         #,'num_leaves': [70]
+         #,'random_state': [501]
+         #,'colsample_bytree': [0.3]
+         #,'subsample': [0.6]
+         #,'is_unbalance': [True]
          }
 
+gridParams_xgb = {
+         #'learning_rate': [0.1]
+          'n_estimators': [10, 20, 30, 40, 60]
+         # ,'max_depth': [3]
+         #,'min_child_weight': [1e-3]
+         #,'min_data_in_leaf': [1800]
+         #,'num_leaves': [70]
+         #,'random_state': [501]
+         #,'colsample_bytree': [0.3]
+         #,'is_unbalance': [True]
+         }
 # view default model params
-print("Default parameters:")
-print(lgbm_est_base.get_params())
+#print("Default parameters:")
+#print(lgbm_est_base.get_params())
 
-search_model(train_x, train_y, lgbm_est_base, gridParams, n_jobs=-1, cv=4, refit=False)
+search_model(train_x, train_y, est_XGB_class[0], gridParams_xgb, n_jobs=-1, cv=4, refit=False)
 
 

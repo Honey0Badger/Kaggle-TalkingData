@@ -10,6 +10,7 @@ import lightgbm as lgb
 
 import xgboost as xgb
 
+from preprocess import *
 from models import *
 from metric import *
 
@@ -37,11 +38,64 @@ def search_model(train_x, train_y, est, param_grid, n_jobs, cv, refit=False):
 
     return model
 
+def LGBM_DataSet(train_df, valid_df, predictors, target, cat_features):
+    train = lgb.Dataset(train_df[predictors].values, label=train_df[target].values,
+                        feature_name=predictors,
+                        categorical_feature=cat_features
+                        )
+    valid = lgb.Dataset(valid_df[predictors].values, label=valid_df[target].values,
+                        feature_name=predictors,
+                        categorical_feature=cat_features
+                        )
+    return train, valid
 
+
+def single_LGBM_train(params, train, valid, metrics, early_stopping_rounds=20):
+    evals_results = {}
+    bst = lgb.train(params
+                    , train
+                    , valid_sets=[train, valid]
+                    , valid_names=['train', 'valid']
+                    , evals_result=evals_results 
+                    , early_stopping_rounds=early_stopping_rounds
+                    , verbose_eval=10
+                    )
+    n_estimators = bst.best_iteration
+    print("\nModel Report:")
+    print("N_estimators : ", n_estimators)
+    print(metrics+":", evals_results['valid'][metrics][n_estimators-1])
+
+    return bst
+
+# xgboost single model module
+def XGB_DMatrix(train_df, valid_df, features, target):
+    Dtrain = xgb.DMatrix(train_df[features], label=train_df[target].values)
+    Dvalid = xgb.DMatrix(valid_df[features], label=valid_df[target].values)
+    return Dtrain, Dvalid
+
+def XGB_Dtest(test_df, features):
+    return xgb.DMatrix(test_df, feature_names=features)
+
+def single_XGB_train(params, dtrain, dvalid, metrics, early_stopping_rounds=20):
+    evals_results = {}
+    bst = xgb.train(params
+                    , dtrain
+                    , evals=[(dtrain,'train'), (dvalid, 'valid')]
+                    , evals_result=evals_results 
+                    , early_stopping_rounds=early_stopping_rounds
+                    , verbose_eval=True
+                    )
+    n_estimators = bst.best_iteration
+    print("\nModel Report:")
+    print("N_estimators : ", n_estimators)
+    print(metrics+":", evals_results['valid'][metrics][n_estimators-1])
+
+    return bst
 
 ## LightGBM blending
 def lgbm_blend(estimators, train_x, train_y, test_x, fold, early_stopping_rounds=0):
     print("Blend %d estimators for %d folds" % (len(estimators), fold))
+    sys.stdout.flush()
     skf  = list(KFold(fold).split(train_y))
 
     test_blend_y = np.zeros((test_x.shape[0], len(estimators)))
@@ -53,6 +107,7 @@ def lgbm_blend(estimators, train_x, train_y, test_x, fold, early_stopping_rounds
         test_blend_y_j = np.zeros((test_x.shape[0],))
         for i, (train, val) in enumerate(skf):
             print("Model %d fold %d" % (j + 1, i + 1))
+            sys.stdout.flush()
             fold_start = time.time()
             if early_stopping_rounds == 0:  # without early stopping
                 est.fit(train_x[train], train_y[train], eval_metric='auc')
@@ -65,6 +120,7 @@ def lgbm_blend(estimators, train_x, train_y, test_x, fold, early_stopping_rounds
                 test_blend_y_j = test_blend_y_j + est.predict_proba(test_x)[:,1]
                 print("Model %d fold %d fitting finished in %0.3fs" 
                         % (j + 1, i + 1, time.time() - fold_start))
+                sys.stdout.flush()
             else:  # early stopping
                 est.set_params(num_boost_round=1000)
                 est.set_params(verbose=-1)
@@ -77,6 +133,7 @@ def lgbm_blend(estimators, train_x, train_y, test_x, fold, early_stopping_rounds
                        )
                 best_rounds[i, j] = est.best_iteration_
                 print("best round %d" % (best_rounds[i,j]))
+                sys.stdout.flush()
                 val_y_predict_fold = est.predict_proba(train_x[val], num_iteration = est.best_iteration_)[:,1]
                 score = roc_auc_score(train_y[val], val_y_predict_fold)
                 del val_y_predict_fold
@@ -85,11 +142,14 @@ def lgbm_blend(estimators, train_x, train_y, test_x, fold, early_stopping_rounds
                 test_blend_y_j = test_blend_y_j + est.predict_proba(test_x, num_iteration = est.best_iteration_)[:,1]
                 print("Model %d fold %d fitting finished in %0.3fs" 
                         % (j + 1, i + 1, time.time() - fold_start))
+                sys.stdout.flush()
             gc.collect()
 
         test_blend_y[:, j] = test_blend_y_j / fold
         print("Score for model %d is %f" % (j + 1, np.mean(scores[:, j])))
+        sys.stdout.flush()
     print("Score for blended models is %f" % (np.mean(scores)))
+    sys.stdout.flush()
     return (test_blend_y, scores, best_rounds)
 
 
@@ -97,6 +157,7 @@ def lgbm_blend(estimators, train_x, train_y, test_x, fold, early_stopping_rounds
 
 def xgb_blend(estimators, train_x, train_y, test_x, fold, early_stopping_rounds=0):
     print("Blend %d estimators for %d folds" % (len(estimators), fold))
+    sys.stdout.flush()
     skf  = list(KFold(fold).split(train_y))
 
     test_blend_y = np.zeros((test_x.shape[0], len(estimators)))
@@ -105,9 +166,11 @@ def xgb_blend(estimators, train_x, train_y, test_x, fold, early_stopping_rounds=
 
     for j, est in enumerate(estimators):
         print("Model %d: %s" % (j + 1, est))
+        sys.stdout.flush()
         test_blend_y_j = np.zeros((test_x.shape[0],))
         for i, (train, val) in enumerate(skf):
             print("Model %d fold %d" % (j + 1, i + 1))
+            sys.stdout.flush()
             fold_start = time.time()
             if early_stopping_rounds == 0:  # without early stopping
                 est.fit(train_x[train], train_y[train], eval_metric='auc')
@@ -119,6 +182,7 @@ def xgb_blend(estimators, train_x, train_y, test_x, fold, early_stopping_rounds=
                 scores[i, j] = score
                 test_blend_y_j = test_blend_y_j + est.predict_proba(test_x)[:,1]
                 print("Model %d fold %d fitting finished in %0.3fs" % (j + 1, i + 1, time.time() - fold_start))
+                sys.stdout.flush()
             else:  # early stopping
                 est.set_params(n_estimators=10000)
                 est.fit(train_x[train],
@@ -131,6 +195,7 @@ def xgb_blend(estimators, train_x, train_y, test_x, fold, early_stopping_rounds=
                 best_round = est.best_iteration
                 best_rounds[i, j] = best_round
                 print("best round %d" % (best_round))
+                sys.stdout.flush()
                 val_y_predict_fold = est.predict_proba(train_x[val], ntree_limit=best_round)[:,1]
                 score = roc_auc_score(train_y[val], val_y_predict_fold)
                 print("AUC Score: ", score)
@@ -138,11 +203,14 @@ def xgb_blend(estimators, train_x, train_y, test_x, fold, early_stopping_rounds=
                 scores[i, j] = score
                 test_blend_y_j = test_blend_y_j + est.predict_proba(test_x, ntree_limit=best_round)[:,1]
                 print("Model %d fold %d fitting finished in %0.3fs" % (j + 1, i + 1, time.time() - fold_start))
+                sys.stdout.flush()
             gc.collect()
             
         test_blend_y[:, j] = test_blend_y_j / fold
         print("Score for model %d is %f" % (j + 1, np.mean(scores[:, j])))
+        sys.stdout.flush()
     print("Score for blended models is %f" % (np.mean(scores)))
+    sys.stdout.flush()
     return (test_blend_y, scores, best_rounds)
 
 

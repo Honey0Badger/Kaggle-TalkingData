@@ -19,7 +19,7 @@ def load_from_file(filepath):
         return data
 
 def load_half_file(filepath):
-        data = pd.read_csv(filepath, nrows=10000000)
+        data = pd.read_csv(filepath, nrows=100000)
         print ("Loading data finished...")
         return data
 
@@ -28,6 +28,26 @@ def sample_inputs(infile, outfile):
         sample = data.head(5000)
         sample.to_csv(outfile, index=False)
 
+def train_DataFrame_processed(train):
+        train_ts = pd.to_datetime(train['click_time'])
+        train.drop(['click_time', 'attributed_time'], axis=1, inplace=True)
+        gc.collect()
+        train = train.assign(weekday=train_ts.dt.day.astype('uint8'))
+        train = train.assign(hour=train_ts.dt.hour.astype('uint8'))
+        del train_ts
+        gc.collect()
+        return train
+
+def test_DataFrame_processed(test):
+        test_ts = pd.to_datetime(test['click_time'])
+        test.drop(['click_id', 'click_time']
+                    , axis=1, inplace=True)
+        test = test.assign(weekday=test_ts.dt.day.astype('uint8'))
+        test = test.assign(hour=test_ts.dt.hour.astype('uint8'))
+        del test_ts
+        gc.collect()
+
+        return test
 
 def process_trainData(train):
         train_ts = pd.to_datetime(train['click_time'])
