@@ -14,6 +14,7 @@ from preprocess import *
 from models import *
 from metric import *
 
+import sys
 import gc
 import numpy as np
 import time
@@ -30,9 +31,15 @@ def search_model(train_x, train_y, est, param_grid, n_jobs, cv, refit=False):
                          cv=cv)
     # Fit Grid Search Model
     model.fit(train_x, train_y)
+    print("mean test scores:\n")
+    print(model.cv_results_.__getitem__('mean_test_score'))
+    print("std test scores:\n")
+    print(model.cv_results_.__getitem__('std_test_score'))
     print("Best score: %0.3f" % model.best_score_)
     print("Best parameters set:", model.best_params_)
     print("**********************************************")
+    sys.stdout.flush()
+
     # saving all model scores
     np.savez('../output/grid_model_scores.npz', model.cv_results_)
 

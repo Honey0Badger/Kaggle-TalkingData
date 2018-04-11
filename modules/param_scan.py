@@ -1,3 +1,4 @@
+import sys
 import os
 import time
 import random
@@ -14,22 +15,17 @@ from pipelines import *
 
 start = time.time()
 
-train_file = '../input/train_CV_sample.csv'
+train_file = '../input/train.csv'
+full_df, len_train = read_merge_process(train_file)
 
-
-#train_data = load_from_file(train_file)
-train_data = load_half_file(train_file)
-train_size = train_data.shape
-
-train_x, train_y = process_trainData(train_data)
-print("train data size: ", train_size)
-
-del train_data
-gc.collect()
+target = 'is_attributed'
+predictors = ['app','device','os','channel','weekday','hour', 
+              'ip_app_count_chns','app_click_freq','app_freq',
+               'channel_freq']
 
 gridParams = {
          #'learning_rate': [0.05]
-         'n_estimators': [16, 18, 20, 22, 24, 26]
+         'n_estimators': [6, 10, 20, 30, 40]
          #,'max_depth': [15]
          #,'min_child_weight': [1e-3, 5e-3, 1e-2, 5e-2]
          #,'min_data_in_leaf': [1800]
@@ -55,6 +51,4 @@ gridParams_xgb = {
 #print("Default parameters:")
 #print(lgbm_est_base.get_params())
 
-search_model(train_x, train_y, est_XGB_class[0], gridParams_xgb, n_jobs=-1, cv=4, refit=False)
-
-
+search_model(full_df[predictors], full_df[target], lgbm_est_base, gridParams, n_jobs=-1, cv=10, refit=False)

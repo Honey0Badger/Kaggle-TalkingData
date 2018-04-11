@@ -5,6 +5,7 @@ from sklearn.model_selection import train_test_split
 from scipy.stats import skew, boxcox
 from sklearn import preprocessing
 
+import sys
 import gc
 import pandas as pd
 import random
@@ -12,15 +13,80 @@ import numpy as np
 import matplotlib.pyplot as plt
 import math
 
+def read_merge_process(ftrain, ftest=None):
+    if (ftest != None):
+        train_df = load_half_file(ftrain)
+        len_train = len(train_df)
+        test_df = load_from_file(ftest)
+        train_df = train_df.append(test_df)
+        del test_df
+    else:
+        train_df = load_file_cv(ftrain)
+    gc.collect()
+
+    print('Preparing data...')
+    sys.stdout.flush()
+    train_df['weekday'] = pd.to_datetime(train_df.click_time).dt.day.astype('uint8')
+    train_df['hour'] = pd.to_datetime(train_df.click_time).dt.hour.astype('uint8')
+    train_df.drop(['click_time', 'attributed_time'], axis=1, inplace=True)
+    gc.collect()
+
+    print('adding features...')
+    sys.stdout.flush()
+
+    # click counts for each ip-app combination
+    gp = train_df[['ip','app', 'channel']]\
+            .groupby(by=['ip', 'app'])[['channel']].count().reset_index()\
+            .rename(index=str, columns={'channel': 'ip_app_count_chns'})
+    train_df = train_df.merge(gp, on=['ip','app'], how='left')
+    del gp
+    gc.collect()
+
+    # how frequently an app was clicked
+    gp = train_df[['ip', 'app']].groupby(by=['app'])[['ip']]\
+            .agg(lambda x: float(len(x)) / len(x.unique())).reset_index()\
+            .rename(index=str, columns={'ip': 'app_click_freq'})
+    train_df = train_df.merge(gp, on=['app'], how='left')
+    del gp
+    gc.collect()
+
+    # how many times an app is clicked
+    gp = train_df[['app', 'channel']].groupby(by=['app'])[['channel']]\
+                   .count().reset_index().rename(index=str, columns\
+                   ={'channel': 'app_freq'})
+    train_df = train_df.merge(gp, on=['app'], how='left')
+
+    # how popular is the channel
+    gp = train_df[['app', 'channel']].groupby(by=['channel'])[['app']]\
+                   .count().reset_index().rename(index=str, columns\
+                   ={'app': 'channel_freq'})
+    train_df = train_df.merge(gp, on=['channel'], how='left')
+    del gp
+    gc.collect()
+
+    train_df['ip_app_count_chns'] = train_df['ip_app_count_chns'].astype('uint16')
+    train_df['app_click_freq'] = train_df['app_click_freq'].astype('uint16')
+    train_df['app_freq'] = train_df['app_freq'].astype('uint16')
+    train_df['channel_freq'] = train_df['channel_freq'].astype('uint16')
+    
+    return train_df, len_train
+
+
 
 def load_from_file(filepath):
         data = pd.read_csv(filepath)
-        print ("Loading data finished...")
+        print ("Loading full data finished...")
         return data
 
 def load_half_file(filepath):
-        data = pd.read_csv(filepath, nrows=100000)
-        print ("Loading data finished...")
+        data = pd.read_csv(filepath, skiprows=range(1,134903891), nrows=50000000)
+        print ("Loading part data finished...")
+        return data
+
+def load_file_cv(filepath):
+        data = pd.read_csv(filepath, skiprows=range(1,174903891), nrows=10000000)
+        #data = pd.read_csv(filepath)
+        print ("Loading part data finished...")
         return data
 
 def sample_inputs(infile, outfile):
