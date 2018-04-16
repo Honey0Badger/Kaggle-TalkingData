@@ -22,19 +22,35 @@ def read_merge_process(ftrain, ftest=None):
         del test_df
     else:
         train_df = load_file_cv(ftrain)
+        len_train = len(train_df)
     gc.collect()
 
     print('Preparing data...')
     sys.stdout.flush()
-    train_df['weekday'] = pd.to_datetime(train_df.click_time).dt.day.astype('uint8')
-    train_df['hour'] = pd.to_datetime(train_df.click_time).dt.hour.astype('uint8')
+
+    # added features on 04/13/18
+    train_df['ip_nextClick'] = train_df[['ip','click_time']].groupby(by=['ip'])\
+            .click_time.transform(lambda x: x.diff().shift(-1)).dt.seconds
+    train_df['ip_app_nextClick'] = train_df[['ip', 'app', 'click_time']]\
+            .groupby(by=['ip', 'app'])\
+            .click_time.transform(lambda x: x.diff().shift(-1)).dt.seconds
+    train_df['ip_chn_nextClick'] = train_df[['ip', 'channel', 'click_time']]\
+            .groupby(by=['ip', 'channel'])\
+            .click_time.transform(lambda x: x.diff().shift(-1)).dt.seconds
+    train_df['ip_os_nextClick'] = train_df[['ip', 'os', 'click_time']]\
+            .groupby(by=['ip', 'os'])\
+            .click_time.transform(lambda x: x.diff().shift(-1)).dt.seconds
+    gc.collect()
+
+    train_df['weekday'] = train_df.click_time.dt.day.astype('uint8')
+    train_df['hour'] = train_df.click_time.dt.hour.astype('uint8')
     train_df.drop(['click_time', 'attributed_time'], axis=1, inplace=True)
     gc.collect()
 
     print('adding features...')
     sys.stdout.flush()
 
-    # click counts for each ip-app combination
+    # features added on 04/09/18
     gp = train_df[['ip','app', 'channel']]\
             .groupby(by=['ip', 'app'])[['channel']].count().reset_index()\
             .rename(index=str, columns={'channel': 'ip_app_count_chns'})
@@ -42,7 +58,6 @@ def read_merge_process(ftrain, ftest=None):
     del gp
     gc.collect()
 
-    # how frequently an app was clicked
     gp = train_df[['ip', 'app']].groupby(by=['app'])[['ip']]\
             .agg(lambda x: float(len(x)) / len(x.unique())).reset_index()\
             .rename(index=str, columns={'ip': 'app_click_freq'})
@@ -50,13 +65,11 @@ def read_merge_process(ftrain, ftest=None):
     del gp
     gc.collect()
 
-    # how many times an app is clicked
     gp = train_df[['app', 'channel']].groupby(by=['app'])[['channel']]\
                    .count().reset_index().rename(index=str, columns\
                    ={'channel': 'app_freq'})
     train_df = train_df.merge(gp, on=['app'], how='left')
 
-    # how popular is the channel
     gp = train_df[['app', 'channel']].groupby(by=['channel'])[['app']]\
                    .count().reset_index().rename(index=str, columns\
                    ={'app': 'channel_freq'})
@@ -64,27 +77,65 @@ def read_merge_process(ftrain, ftest=None):
     del gp
     gc.collect()
 
+    # added features on 04/11/18
+    gp = train_df[['ip','weekday','hour','channel']]\
+            .groupby(by=['ip','weekday','hour'])[['channel']].count()\
+            .reset_index().rename(index=str, columns={'channel': 'ip_day_hour_count_chns'})
+    train_df = train_df.merge(gp, on=['ip','weekday','hour'], how='left')
+    del gp
+    gc.collect()
+
+    gp = train_df[['ip','app', 'os', 'channel']]\
+            .groupby(by=['ip', 'app', 'os'])[['channel']].count().reset_index()\
+            .rename(index=str, columns={'channel': 'ip_app_os_count_chns'})
+    train_df = train_df.merge(gp, on=['ip','app', 'os'], how='left')
+    del gp
+    gc.collect()
+
+    gp = train_df[['ip','weekday','hour','channel']].groupby(by=['ip','weekday','channel'])\
+            [['hour']].var().reset_index().rename(index=str, columns={'hour': 'ip_day_chn_var_hour'})
+    train_df = train_df.merge(gp, on=['ip','weekday','channel'], how='left')
+    train_df.fillna(0, inplace=True)
+    del gp
+    gc.collect()
+
+    gp = train_df[['ip','app', 'channel','hour']]\
+            .groupby(by=['ip', 'app', 'channel'])[['hour']].mean()\
+            .reset_index().rename(index=str, columns={'hour': 'ip_app_chn_mean_hour'})
+    train_df = train_df.merge(gp, on=['ip','app', 'channel'], how='left')
+    del gp
+    gc.collect()
+
+
     train_df['ip_app_count_chns'] = train_df['ip_app_count_chns'].astype('uint16')
-    train_df['app_click_freq'] = train_df['app_click_freq'].astype('uint16')
-    train_df['app_freq'] = train_df['app_freq'].astype('uint16')
-    train_df['channel_freq'] = train_df['channel_freq'].astype('uint16')
+    train_df['ip_day_hour_count_chns'] = train_df['ip_day_hour_count_chns'].astype('uint16')
+    train_df['ip_app_os_count_chns'] = train_df['ip_app_os_count_chns'].astype('uint16')
+
+    predictors = ['app','device','os','channel','weekday','hour', 
+                  'ip_app_count_chns', 'app_click_freq','app_freq',
+                  'channel_freq',  'ip_day_hour_count_chns', 
+                  'ip_app_os_count_chns',  'ip_day_chn_var_hour',
+                  'ip_app_chn_mean_hour', 'ip_nextClick',  'ip_app_nextClick',
+                  'ip_chn_nextClick', 'ip_os_nextClick' ]
     
-    return train_df, len_train
+    return train_df, len_train, predictors
 
 
 
 def load_from_file(filepath):
-        data = pd.read_csv(filepath)
+        data = pd.read_csv(filepath, parse_dates=['click_time'])
         print ("Loading full data finished...")
         return data
 
 def load_half_file(filepath):
-        data = pd.read_csv(filepath, skiprows=range(1,134903891), nrows=50000000)
+        data = pd.read_csv(filepath, skiprows=range(1,124903891)
+                , nrows=60000000, parse_dates=['click_time'])
         print ("Loading part data finished...")
         return data
 
 def load_file_cv(filepath):
-        data = pd.read_csv(filepath, skiprows=range(1,174903891), nrows=10000000)
+        data = pd.read_csv(filepath, skiprows=range(1,174903891)
+                , nrows=10000000, parse_dates=['click_time'])
         #data = pd.read_csv(filepath)
         print ("Loading part data finished...")
         return data

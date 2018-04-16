@@ -1,14 +1,14 @@
 #!/bin/bash
 ### job name
 #SBATCH --job-name=gbm_ML
-#SBATCH --time=10:00:00
+#SBATCH --time=7:00:00
 #SBATCH -p gpu
 #SBATCH --gres=gpu:k80
 ### set output files
 #SBATCH -e errfile
 #SBATCH --output=outputfile 
 #SBATCH -A ghosh_yunkun
-#SBATCH --mem=60000
+#SBATCH --mem=80000
 
 module load singularity
 module load tensorflow/1.6.0-py36

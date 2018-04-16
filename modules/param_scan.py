@@ -16,12 +16,9 @@ from pipelines import *
 start = time.time()
 
 train_file = '../input/train.csv'
-full_df, len_train = read_merge_process(train_file)
+full_df, len_train, predictors = read_merge_process(train_file)
 
 target = 'is_attributed'
-predictors = ['app','device','os','channel','weekday','hour', 
-              'ip_app_count_chns','app_click_freq','app_freq',
-               'channel_freq']
 
 gridParams = {
          #'learning_rate': [0.05]
