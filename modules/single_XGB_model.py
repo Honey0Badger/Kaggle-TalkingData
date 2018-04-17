@@ -20,78 +20,104 @@ sys.stdout.flush()
 
 start = time.time()
 
-train_file = '../input/train.csv'
-#train_data = load_from_file(train_file)
-train_data = load_half_file(train_file)
-train_size = train_data.shape
-print("train data shape: ", train_size)
-train_data.info()
-
-train_df = train_DataFrame_processed(train_data)
-sys.stdout.flush()
+##################### if process data needed ######################
+#train_file = '../input/train.csv'
+#test_file = '../input/test.csv'
+#full_df, len_train, predictors = read_merge_process(train_file, ftest=test_file)
+#print("*************************  Full data info **********************************\n")
+#full_df.info()
+#print("*************************  End of data info **********************************\n")
+#sys.stdout.flush()
             
-process = psutil.Process(os.getpid())
-print("Current process memory usage: ", process.memory_info().rss/1048576)
+#process = psutil.Process(os.getpid())
+#print("- - - - - - - Memory usage check: ", process.memory_info().rss/1048576)
+#sys.stdout.flush()
 
+#print('all columns:\n', list(full_df), "\n")
+#target = 'is_attributed'
+
+#print('Predictors used for training: \n', predictors, "\n")
+#cat_features = ['app', 'device','os', 'channel', 'weekday', 'hour']
+#sys.stdout.flush()
+##################### end of process data needed ######################
+
+##################### load pre-processed data #####################
+full_df = pd.read_pickle('18_feature_bot60m_data.pkl')
+predictors = ['app','device','os','channel','weekday','hour', 
+                  'ip_app_count_chns', 'app_click_freq','app_freq',
+                  'channel_freq',  'ip_day_hour_count_chns', 
+                  'ip_app_os_count_chns',  'ip_day_chn_var_hour',
+                  'ip_app_chn_mean_hour', 'ip_nextClick',  'ip_app_nextClick',
+                  'ip_chn_nextClick', 'ip_os_nextClick' ]
+
+cat_features = ['app', 'device','os', 'channel', 'weekday', 'hour']
+
+len_train = 60000000
 target = 'is_attributed'
-features = ['ip','app', 'device','os', 'channel', 'weekday', 'hour']
 
-train_split = 80000
-train = train_df[:train_split]
-valid = train_df[train_split:]
-Dtrain, Dvalid = XGB_DMatrix(train, valid, features, target)
+print("*************************  Full data info **********************************\n")
+full_df.info()
+print("*************************  End of data info **********************************\n")
+#################### end of loading processed data ###################################
+
+
+
+print('total train data size: ', len_train)
+#train_split = 170000000
+train_split = 56000000
+#train_split = 50000
+train_df = full_df[:train_split]
+valid_df = full_df[train_split:len_train]
+test_df = full_df[len_train:]
+
+del full_df
+gc.collect()
+
+print('train size: ', len(train_df))
+print('valid size: ', len(valid_df))
+print(' test size: ', len(test_df))
+print('\n')
+sys.stdout.flush()
+
+
+Dtrain, Dvalid = XGB_DMatrix(train_df, valid_df, predictors, target)
 
 process = psutil.Process(os.getpid())
 print("Current process memory usage: ", process.memory_info().rss/1048576)
-del train_data, train_df, train, valid
+del train_df, valid_df
 gc.collect()
 
 xgb_params = {'objective':'binary:logistic'
-              , 'eta':0.3
               , 'tree_method':'hist'
               , 'grow_policy':'lossguide'
-              , 'max_leaves': 1400
-              , 'max_depth': 0
-              , 'subsample': 0.9
-              , 'colsample_bytree': 0.7
-              , 'colsample_bylevel': 0.7
-              , 'min_child_weight':0
-              , 'alpha': 4
+              #, 'max_depth': 3
+              , 'subsample': 1.0
+              , 'colsample_bytree': 0.5
+              , 'min_child_weight': 1e-3
               , 'scale_pos_weight': 300
-              , 'eval_metric': 'auc'
               , 'random_state': 300
+              , 'eval_metric' : 'auc'
               , 'silent': True
-              #, n_estimators=10
             }
 
 xgb_model = single_XGB_train(  xgb_params, 
                                Dtrain, 
                                Dvalid, 
                                metrics='auc',
-                               early_stopping_rounds=20)
+                               early_stopping_rounds=30 )
 
 process = psutil.Process(os.getpid())
 print("Current process memory usage: ", process.memory_info().rss/1048576)
 del Dtrain, Dvalid
 gc.collect()
 
-# predict the test set
-test_file = '../input/test_small.csv'
-test_data = load_from_file(test_file)
-Id = test_data['click_id'].values
-test_size=test_data.shape
-test_df = test_DataFrame_processed(test_data)
-Dtest = XGB_Dtest(test_df, features)
-print ("feature extracted.")
-print("test data size: ", test_size)
-test_df.info()
-sys.stdout.flush()
+Dtest = XGB_Dtest(test_df, predictors)
 
 process = psutil.Process(os.getpid())
 print("Current process memory usage: ", process.memory_info().rss/1048576)
 
-submission = pd.DataFrame()
-submission['is_attributed'] = xgb_model.predict(Dtest, ntree_limit=xgb_model.best_ntree_limit)
-submission.insert(loc=0, column='click_id', value = Id)
-submission.to_csv("../output/test_pred_xgb.csv", index=False, float_format='%1.5f')
+sub = pd.DataFrame()
+sub['click_id'] = test_df['click_id'].astype('int')
+sub['is_attributed'] = xgb_model.predict(Dtest, ntree_limit=xgb_model.best_ntree_limit)
+sub.to_csv("../output/xgb_f17_bot6m_SM_gridCV_param.csv", index=False, float_format='%1.5f')
 

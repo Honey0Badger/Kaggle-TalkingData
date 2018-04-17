@@ -81,12 +81,13 @@ def XGB_DMatrix(train_df, valid_df, features, target):
     return Dtrain, Dvalid
 
 def XGB_Dtest(test_df, features):
-    return xgb.DMatrix(test_df, feature_names=features)
+    return xgb.DMatrix(test_df[features])
 
-def single_XGB_train(params, dtrain, dvalid, metrics, early_stopping_rounds=20):
+def single_XGB_train(params, dtrain, dvalid, metrics, early_stopping_rounds=30):
     evals_results = {}
     bst = xgb.train(params
                     , dtrain
+                    , num_boost_round=1000
                     , evals=[(dtrain,'train'), (dvalid, 'valid')]
                     , evals_result=evals_results 
                     , early_stopping_rounds=early_stopping_rounds
