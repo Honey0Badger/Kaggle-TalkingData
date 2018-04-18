@@ -100,3 +100,10 @@ xgb_est_base = xgb.XGBClassifier( objective='binary:logistic'
                                  , eval_metric='auc'
                                  , random_state = 9
                                 )
+
+xgb_est_base2 = xgb.XGBClassifier( objective='binary:logistic'
+                                 , tree_method='approx'
+                                 , eval_metric='auc'
+                                 , random_state = 9
+                                 , n_jobs = 1
+                                )

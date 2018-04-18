@@ -2,6 +2,7 @@ from sklearn.metrics import roc_auc_score
 from sklearn import  model_selection
 from sklearn.model_selection import StratifiedKFold, KFold
 from sklearn.model_selection import GridSearchCV
+from skopt import BayesSearchCV
 from sklearn.linear_model import ElasticNet, Ridge, LinearRegression
 
 import lightgbm as lgb
@@ -46,6 +47,45 @@ def search_model(train_x, train_y, est, param_grid, n_jobs, cv, refit=False):
 #    np.savez('../output/grid_model_scores.npz', model.cv_results_)
 
     return model
+
+
+def Bayes_search(train_x, train_y, est, param_range, cv, iterations=100, n_jobs=1, refit=False):
+    # Grid Search for the best model
+    bayes_model = BayesSearchCV(estimator=est,
+                          search_spaces=param_range,
+                          scoring='roc_auc',
+                          verbose=0,
+                          n_jobs=n_jobs,
+                          refit=refit,
+                          n_iter = iterations,
+                          random_state=42,
+                          cv=cv)
+    
+    # define callback function
+    def status_print(optim_result):
+        """Status callback durring bayesian hyperparameter search (From kaggle NanoMathias kernal)"""
+
+        # Get all the models tested so far in DataFrame format
+        all_models = pd.DataFrame(bayes_model.cv_results_)    
+
+        # Get current parameters and the best parameters    
+        best_params = pd.Series(bayes_model.best_params_)
+        print('Model #{}\nBest ROC-AUC: {}\nBest params: {}\n'.format(
+                len(all_models),
+                np.round(bayes_model.best_score_, 4),
+                bayes_model.best_params_
+        ))
+                                        
+        # Save all model results
+        clf_name = bayes_model.estimator.__class__.__name__
+        all_models.to_csv(clf_name+"_cv_results.csv")
+
+    # Fit Grid Search Model
+    bayes_model.fit(train_x, train_y, callback=status_print)
+
+    return 0
+
+
 
 def LGBM_DataSet(train_df, valid_df, predictors, target, cat_features):
     train = lgb.Dataset(train_df[predictors].values, label=train_df[target].values,
