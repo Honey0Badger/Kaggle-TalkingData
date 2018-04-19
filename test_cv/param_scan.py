@@ -8,24 +8,24 @@ import math
 
 import pandas as pd
 
-from preprocess import *
+#from preprocess import *
 from models import lgbm_est_base, xgb_est_base
-from preprocess import *
+from preprocess2 import *
 from pipelines import *
 
 start = time.time()
 
 #train_file = '../input/train_CV_sample.csv'
-#full_df, len_train, predictors = read_merge_process(train_file)
+#full_df, len_train, predictors = read_merge_process2(train_file)
+#full_df.to_pickle('22_feature.pkl')
 
-#full_df.to_pickle('18_feature.pkl')
-full_df = pd.read_pickle('18_feature.pkl')
-predictors = ['app','device','os','channel','weekday','hour', 
-                  'ip_app_count_chns', 'app_click_freq','app_freq',
-                  'channel_freq',  'ip_day_hour_count_chns', 
-                  'ip_app_os_count_chns',  'ip_day_chn_var_hour',
-                  'ip_app_chn_mean_hour', 'ip_nextClick',  'ip_app_nextClick',
-                  'ip_chn_nextClick', 'ip_os_nextClick' ]
+full_df = pd.read_pickle('22_feature.pkl')
+predictors = [ 'app','channel','device','os','day','hour',
+               'X0', 'X1', 'X2', 'X3', 'X4', 'X5', 'X6', 
+               'X7', 'X8', 'ip_tcount', 'ip_app_count', 
+               'ip_app_os_count', 'ip_tchan_count', 'ip_app_os_var',
+               'ip_app_channel_var_day', 'ip_app_channel_mean_hour', 
+               'nextClick', 'nextClick_shift' ]
 len_train = len(full_df)
 
 print('**************** full data info *****************\n')
@@ -35,16 +35,16 @@ print('**************** end of data info *****************\n')
 target = 'is_attributed'
 
 gridParams = {
-         'learning_rate': [0.11],
-         'n_estimators': [15]
-         ,'max_depth': [7]
-         ,'min_child_weight': [1e-3, 1e-2, 1e-1, 5e-1]
-         ,'min_data_in_leaf': [30]
-         ,'num_leaves': [40]
-         ,'max_bin': [500]
-         #,'random_state': [501]
+         'learning_rate': [0.1],
+         'n_estimators':  [30]
+         ,'max_depth': [12]
+         ,'min_child_weight': [1e-3]
+         ,'min_data_in_leaf': [70]
+         ,'num_leaves': [25]
+         ,'max_bin':  [400]
+         ,'random_state': [501]
          ,'colsample_bytree': [1.0]
-         ,'subsample': [0.1]
+         ,'subsample': [0.65]
          #,'is_unbalance': [True]
          }
 
@@ -66,4 +66,4 @@ gridParams_xgb = {
 #print("Default parameters:")
 #print(lgbm_est_base.get_params())
 
-search_model(full_df[predictors], full_df[target], xgb_est_base, gridParams_xgb, n_jobs=1, cv=10, refit=False)
+search_model(full_df[predictors], full_df[target], lgbm_est_base, gridParams, n_jobs=1, cv=10, refit=False)

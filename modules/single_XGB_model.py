@@ -42,7 +42,7 @@ start = time.time()
 ##################### end of process data needed ######################
 
 ##################### load pre-processed data #####################
-full_df = pd.read_pickle('18_feature_bot60m_data.pkl')
+full_df = pd.read_pickle('./18_feature_bot60m_data.pkl')
 predictors = ['app','device','os','channel','weekday','hour', 
                   'ip_app_count_chns', 'app_click_freq','app_freq',
                   'channel_freq',  'ip_day_hour_count_chns', 
@@ -88,15 +88,20 @@ del train_df, valid_df
 gc.collect()
 
 xgb_params = {'objective':'binary:logistic'
-              , 'tree_method':'hist'
-              , 'grow_policy':'lossguide'
-              #, 'max_depth': 3
-              , 'subsample': 1.0
-              , 'colsample_bytree': 0.5
-              , 'min_child_weight': 1e-3
-              , 'scale_pos_weight': 300
-              , 'random_state': 300
               , 'eval_metric' : 'auc'
+              , 'tree_method':'approx'
+              , 'gamma': 5.104e-8
+              , 'learning_rate': 0.15
+              , 'max_depth': 6
+              , 'max_delta_step': 20
+              , 'min_child_weight': 4
+              , 'subsample': 1.0
+              , 'colsample_bytree': 1.0
+              , 'colsample_bylevel': 0.1
+              , 'scale_pos_weight': 500
+              , 'random_state': 300
+              , 'reg_alpha': 1e-9
+              , 'reg_lambda': 1000
               , 'silent': True
             }
 
@@ -111,6 +116,9 @@ print("Current process memory usage: ", process.memory_info().rss/1048576)
 del Dtrain, Dvalid
 gc.collect()
 
+print("Current model parameters:\n")
+print(xgb_params)
+
 Dtest = XGB_Dtest(test_df, predictors)
 
 process = psutil.Process(os.getpid())
@@ -119,5 +127,5 @@ print("Current process memory usage: ", process.memory_info().rss/1048576)
 sub = pd.DataFrame()
 sub['click_id'] = test_df['click_id'].astype('int')
 sub['is_attributed'] = xgb_model.predict(Dtest, ntree_limit=xgb_model.best_ntree_limit)
-sub.to_csv("../output/xgb_f17_bot6m_SM_gridCV_param.csv", index=False, float_format='%1.5f')
+sub.to_csv("../output/xgb_f17_bot6m_SM_kernal_param.csv", index=False, float_format='%1.5f')
 

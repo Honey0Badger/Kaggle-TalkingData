@@ -6,7 +6,7 @@
 #SBATCH --gres=gpu:k80
 ### set output files
 #SBATCH -e errfile
-#SBATCH --output=outputfile 
+#SBATCH --output=outputfile_lgbm 
 #SBATCH -A ghosh_yunkun
 #SBATCH --mem=80000
 

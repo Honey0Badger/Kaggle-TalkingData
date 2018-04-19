@@ -42,8 +42,6 @@ est_LGBM_test = [lgb.LGBMClassifier(   learning_rate=0.25
 lgbm_est_base = lgb.LGBMClassifier(   learning_rate=0.1
                                        , boosting_type='gbdt'
                                        , objective='binary'
-                                       , is_unbalance=True
-                                       #, scale_pos_weight =300 # because training data is extremely unbalanced 
                                        , verbose = 0 )
 
 lgbm_f10 = {lgb.LGBMClassifier( boosting_type = 'gbdt',
