@@ -1,6 +1,5 @@
 """
 Model 1: LGBM on inputs with 28 features,
-         this script will only save models
 """
 
 import gc
@@ -18,7 +17,7 @@ from sklearn.model_selection import KFold
 import lightgbm as lgb
 
 now = datetime.datetime.now()
-print("Model id: 1\n")
+print("\nModel id: 1")
 print("Model type: LGBM\n")
 print("Print timestamp for record...")
 print(now.strftime("%Y-%m-%d %H:%M"))
@@ -26,7 +25,7 @@ sys.stdout.flush()
 
 start = time.time()
 
-debug = True
+debug = False
 ##################### load pre-processed data #####################
 if debug:
     full_df = pd.read_pickle('./pre_proc_inputs/debug_f28_full_data.pkl')
@@ -86,7 +85,7 @@ lgbm_params = {
     'scale_pos_weight':300 # because training data is extremely unbalanced 
 }
 early_stopping_rounds = 30
-print("Model parameters:\n", lgbm_params)
+print("\n Model parameters:\n", lgbm_params)
 
 
 # create cv indices
@@ -101,6 +100,10 @@ print('\ntest size: ', len(test_df))
 train_oos_pred = np.zeros((train_len, 1))
 test_pred = np.zeros((test_len, 1))
 scores = np.zeros((fold,))
+
+process = psutil.Process(os.getpid())
+print("\n- - - - - - - Memory usage check: ", process.memory_info().rss/1048576)
+sys.stdout.flush()
 
 for i, (train, val) in  enumerate(skf):
         print("Fold %d" % (i + 1))
@@ -144,11 +147,11 @@ for i, (train, val) in  enumerate(skf):
                 print("Fold %d fitting finished in %0.3fs" 
                         % (i + 1, time.time() - fold_start))
 
-        test_pred = test_pred / fold
         print("Score for model is %f" % (scores[i]))
         sys.stdout.flush()
         gc.collect()
 
+test_pred = test_pred / fold
 print("Score for blended models is %f" % (np.mean(scores)))
 sys.stdout.flush()
 
@@ -161,6 +164,6 @@ if debug:
     np.savetxt("./model_outputs/debug_model_id1_train.csv", train_oos_pred, fmt='%.5f', delimiter=",")
     np.savetxt("./model_outputs/debug_model_id1_test.csv", test_pred, fmt='%.5f', delimiter=",")
 else:
-    np.savetxt("./model_outputs/model_id1_train.csv", train_oos_pred, fmt='%.5f', delimiter=",")
-    np.savetxt("./model_outputs/model_id1_test.csv", test_pred, fmt='%.5f', delimiter=",")
+    np.savetxt("./model_outputs/model_id1_train_pred.csv", train_oos_pred, fmt='%.5f', delimiter=",")
+    np.savetxt("./model_outputs/model_id1_test_pred.csv", test_pred, fmt='%.5f', delimiter=",")
 
