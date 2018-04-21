@@ -68,7 +68,6 @@ lgbm_params = {
     'objective': 'binary',
     'metric': 'auc',
     'learning_rate': 0.1,
-    'num_iterations': 1000,
     #'is_unbalance': 'true', # replaced with scale_pos_weight argument
     'num_leaves': 25,  # 2^max_depth - 1
     'max_depth': 12,  # -1 means no limit
@@ -85,6 +84,7 @@ lgbm_params = {
     'scale_pos_weight':300 # because training data is extremely unbalanced 
 }
 early_stopping_rounds = 30
+num_boost_round = 100
 print("\n Model parameters:\n", lgbm_params)
 
 
@@ -116,6 +116,7 @@ for i, (train, val) in  enumerate(skf):
                 print("No early stopping...\n")
                 bst = lgb.train(  lgbm_params
                                 , train_set
+                                , num_boost_round=num_boost_round
                                 , valid_sets=[train_set, val_set]
                                 , valid_names=['train', 'valid']
                                 , evals_result=evals_results 
@@ -129,8 +130,10 @@ for i, (train, val) in  enumerate(skf):
                 print("Fold %d fitting finished in %0.3fs" 
                         % (i + 1, time.time() - fold_start))
         else:  # early stopping
+                print("use early stopping...\n")
                 bst = lgb.train(  lgbm_params
                                 , train_set
+                                , num_boost_round=1000
                                 , valid_sets=[train_set, val_set]
                                 , valid_names=['train', 'valid']
                                 , evals_result=evals_results 

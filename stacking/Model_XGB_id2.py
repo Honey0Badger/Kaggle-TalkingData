@@ -17,8 +17,8 @@ from sklearn.model_selection import KFold
 import xgboost as xgb
 
 now = datetime.datetime.now()
-print("\nModel id: 1")
-print("Model type: LGBM\n")
+print("\nModel id: 2")
+print("Model type: XGB\n")
 print("Print timestamp for record...")
 print(now.strftime("%Y-%m-%d %H:%M"))
 sys.stdout.flush()
@@ -85,12 +85,12 @@ print("\n Model parameters:\n", params)
 
 
 
+fold = 4
 # save out-of-sample prediction for train data and prediction for test data
 train_oos_pred = np.zeros((train_len, 1))
-test_pred = np.zeros((test_len, 1))
+test_pred = np.zeros((test_len, fold))
 
 # create cv indices
-fold = 4
 skf  = list(KFold(fold).split(train_oos_pred))
 scores = np.zeros((fold,))
 
@@ -119,7 +119,7 @@ for i, (train, val) in  enumerate(skf):
                 print("AUC :", evals_results['valid']['auc'][-1])
                 scores[i] = evals_results['valid']['auc'][-1]
                 train_oos_pred[val, 0] = bst.predict(val_set)
-                test_pred[:, 0] = test_pred[:, 0] + bst.predict(dtest)
+                test_pred[:, i] = bst.predict(dtest)
                 print("Fold %d fitting finished in %0.3fs" % (i + 1, time.time() - fold_start))
         else:  # early stopping
                 bst = xgb.train(params
@@ -136,14 +136,14 @@ for i, (train, val) in  enumerate(skf):
                 print("AUC :", evals_results['valid']['auc'][best_round-1])
                 scores[i] = evals_results['valid']['auc'][best_round-1]
                 train_oos_pred[val, 0] = bst.predict(val_set, ntree_limit=bst.best_ntree_limit)
-                test_pred[:, 0] = test_pred[:, 0] + bst.predict(dtest, ntree_limit=bst.best_ntree_limit)
+                test_pred[:, i] = bst.predict(dtest, ntree_limit=bst.best_ntree_limit)
                 print("Fold %d fitting finished in %0.3fs" % (i + 1, time.time() - fold_start))
 
         print("Score for model is %f" % (scores[i]))
         sys.stdout.flush()
         gc.collect()
 
-test_pred = test_pred / fold
+test_pred_blend = np.mean(test_pred, axis=1)
 print("Score for blended models is %f" % (np.mean(scores)))
 
 process = psutil.Process(os.getpid())
@@ -153,8 +153,8 @@ sys.stdout.flush()
 
 if debug:
     np.savetxt("./model_outputs/debug_model_id2_train.csv", train_oos_pred, fmt='%.5f', delimiter=",")
-    np.savetxt("./model_outputs/debug_model_id2_test.csv", test_pred, fmt='%.5f', delimiter=",")
+    np.savetxt("./model_outputs/debug_model_id2_test.csv", test_pred_blend, fmt='%.5f', delimiter=",")
 else:
-    np.savetxt("./model_outputs/model_id2_train_pred.csv", train_oos_pred, fmt='%.5f', delimiter=",")
-    np.savetxt("./model_outputs/model_id2_test_pred.csv", test_pred, fmt='%.5f', delimiter=",")
+    np.savetxt("./model_outputs/model_xgb_id2_train_pred.csv", train_oos_pred, fmt='%.5f', delimiter=",")
+    np.savetxt("./model_outputs/model_xgb_id2_test_pred.csv", test_pred_blend, fmt='%.5f', delimiter=",")
 
