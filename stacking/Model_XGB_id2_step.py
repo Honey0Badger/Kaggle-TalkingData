@@ -16,16 +16,26 @@ import pandas as pd
 from sklearn.model_selection import KFold
 import xgboost as xgb
 
+
 now = datetime.datetime.now()
 print("\nModel id: 2")
 print("Model type: XGB\n")
 print("Print timestamp for record...")
 print(now.strftime("%Y-%m-%d %H:%M"))
+if len(sys.argv) <= 2:
+    print("Usage: python *.py npzfile [fold #]")
+    exit()
+else:
+    print("debug:", sys.argv)
+    npzfile = sys.argv[1]
+    run_folds = list(map(int, sys.argv[2:]))
+    print("Run the following folds for Model...", run_folds)
+    print("saving temperory data to file...", npzfile)
 sys.stdout.flush()
 
 start = time.time()
 
-debug = False
+debug = True
 ##################### load pre-processed data #####################
 if debug:
     #full_df = pd.read_pickle('./pre_proc_inputs/debug_f28_full_data.pkl')
@@ -86,10 +96,10 @@ print("\n Model parameters:\n", params)
 
 
 
-fold = 4
+fold = 10
 # save out-of-sample prediction for train data and prediction for test data
-train_oos_pred = np.zeros((train_len, 1))
-test_pred = np.zeros((test_len, fold))
+train_oos_pred = np.zeros((train_len,))
+test_pred = np.zeros((test_len,))
 
 # create cv indices
 skf  = list(KFold(fold).split(train_oos_pred))
@@ -100,7 +110,9 @@ print("\n- - - - - - - Memory usage check: ", process.memory_info().rss/1048576)
 sys.stdout.flush()
 
 for i, (train, val) in  enumerate(skf):
-        print("Fold %d" % (i + 1))
+        if i not in run_folds:
+            continue
+        print("Fold %d" % (i))
         sys.stdout.flush()
         fold_start = time.time()
         train_set = dtrain.slice(train)
@@ -119,9 +131,9 @@ for i, (train, val) in  enumerate(skf):
                 print("\nModel Report:\n")
                 print("AUC :", evals_results['valid']['auc'][-1])
                 scores[i] = evals_results['valid']['auc'][-1]
-                train_oos_pred[val, 0] = bst.predict(val_set)
-                test_pred[:, i] = bst.predict(dtest)
-                print("Fold %d fitting finished in %0.3fs" % (i + 1, time.time() - fold_start))
+                train_oos_pred = bst.predict(val_set)
+                test_pred = bst.predict(dtest)
+                print("Fold %d fitting finished in %0.3fs" % (i, time.time() - fold_start))
         else:  # early stopping
                 bst = xgb.train(params
                                 , train_set
@@ -136,25 +148,17 @@ for i, (train, val) in  enumerate(skf):
                 print("N_estimators : ", best_round)
                 print("AUC :", evals_results['valid']['auc'][best_round-1])
                 scores[i] = evals_results['valid']['auc'][best_round-1]
-                train_oos_pred[val, 0] = bst.predict(val_set, ntree_limit=bst.best_ntree_limit)
-                test_pred[:, i] = bst.predict(dtest, ntree_limit=bst.best_ntree_limit)
-                print("Fold %d fitting finished in %0.3fs" % (i + 1, time.time() - fold_start))
+                train_oos_pred[val] = bst.predict(val_set, ntree_limit=bst.best_ntree_limit)
+                test_pred = bst.predict(dtest, ntree_limit=bst.best_ntree_limit)
+                print("Fold %d fitting finished in %0.3fs" % (i, time.time() - fold_start))
 
         print("Score for model is %f" % (scores[i]))
+        np.savez(npzfile+'_'+str(i), fold=i, train_ind=val, train_pred=train_oos_pred[val]
+                 , test_pred=test_pred, score=scores[i])
         process = psutil.Process(os.getpid())
         print("\n- - - - - - - Memory usage check: ", process.memory_info().rss/1048576)
         sys.stdout.flush()
         del train_set, val_set
         gc.collect()
 
-test_pred_blend = np.mean(test_pred, axis=1)
-print("Score for blended models is %f" % (np.mean(scores)))
-
-
-if debug:
-    np.savetxt("./model_outputs/debug_model_id2_train.csv", train_oos_pred, fmt='%.5f', delimiter=",")
-    np.savetxt("./model_outputs/debug_model_id2_test.csv", test_pred_blend, fmt='%.5f', delimiter=",")
-else:
-    np.savetxt("./model_outputs/model_xgb_id2_train_pred.csv", train_oos_pred, fmt='%.5f', delimiter=",")
-    np.savetxt("./model_outputs/model_xgb_id2_test_pred.csv", test_pred_blend, fmt='%.5f', delimiter=",")
-
+print("\nEnd of current fold...")
