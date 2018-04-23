@@ -7,11 +7,14 @@ import numpy as np
 # specify the overall parameters for the model
 # check those parameters carefully before each run
 debug = True
-prefix = './test_step'
-nfold = 10
+#prefix = './tmp_data/xgb_cv'
+prefix = './test_lgbm_step'
+nfold = 4
+#train_len = 184903890
+#test_len = 18790469
 train_len = 49999
 test_len = 49999
-outfile = './model_outputs/cv_step_benchmark'
+outfile = './model_outputs/f24_lgbm'
 
 # iniatialize constructed array
 train_oos_pred = np.zeros((train_len,))

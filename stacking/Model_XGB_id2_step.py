@@ -26,7 +26,7 @@ if len(sys.argv) <= 2:
     print("Usage: python *.py npzfile [fold #]")
     exit()
 else:
-    print("debug:", sys.argv)
+#    print("debug:", sys.argv)
     npzfile = sys.argv[1]
     run_folds = list(map(int, sys.argv[2:]))
     print("Run the following folds for Model...", run_folds)
@@ -35,7 +35,9 @@ sys.stdout.flush()
 
 start = time.time()
 
-debug = True
+debug = False
+fold = 4
+
 ##################### load pre-processed data #####################
 if debug:
     #full_df = pd.read_pickle('./pre_proc_inputs/debug_f28_full_data.pkl')
@@ -96,7 +98,7 @@ print("\n Model parameters:\n", params)
 
 
 
-fold = 10
+print("Running %d fold cross validation...\n" % fold)
 # save out-of-sample prediction for train data and prediction for test data
 train_oos_pred = np.zeros((train_len,))
 test_pred = np.zeros((test_len,))
@@ -131,7 +133,7 @@ for i, (train, val) in  enumerate(skf):
                 print("\nModel Report:\n")
                 print("AUC :", evals_results['valid']['auc'][-1])
                 scores[i] = evals_results['valid']['auc'][-1]
-                train_oos_pred = bst.predict(val_set)
+                train_oos_pred[val] = bst.predict(val_set)
                 test_pred = bst.predict(dtest)
                 print("Fold %d fitting finished in %0.3fs" % (i, time.time() - fold_start))
         else:  # early stopping

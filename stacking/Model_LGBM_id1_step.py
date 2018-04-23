@@ -1,5 +1,5 @@
 """
-Model 1: LGBM on inputs with 28 features,
+Model 1: LGBM on inputs with 28 features, one cv step
 """
 
 import gc
@@ -21,20 +21,28 @@ print("\nModel id: 1")
 print("Model type: LGBM\n")
 print("Print timestamp for record...")
 print(now.strftime("%Y-%m-%d %H:%M"))
+if len(sys.argv) <= 2:
+    print("Usage: python *.py npzfile [fold #]")
+    exit()
+else:
+#    print("debug:", sys.argv)
+    npzfile = sys.argv[1]
+    run_folds = list(map(int, sys.argv[2:]))
+    print("Run the following folds for Model...", run_folds)
+    print("saving temperory data to file...", npzfile)
 sys.stdout.flush()
 
 start = time.time()
 
 debug = False
+fold = 4
 ##################### load pre-processed data #####################
 if debug:
     full_df = pd.read_pickle('./pre_proc_inputs/debug_f28_full_data.pkl')
-    train_file = './pre_proc_inputs/debug_f28_lgbm_train.bin'
     train_len = 49999
     test_len = 49999
 else:
     full_df = pd.read_pickle('./pre_proc_inputs/f28_full_data.pkl')
-    train_file = './pre_proc_inputs/f28_lgbm_train.bin'
     train_len = 184903890
     test_len = 18790469
 
@@ -54,14 +62,6 @@ print("*************************  End of data info *****************************
 print("\nfeatures:\n", predictors)
 sys.stdout.flush()
 #################### end of loading processed data ###################################
-    
-#lgb_train_data = lgb.Dataset(train_file, feature_name=predictors, 
-#                              categorical_feature=cat_features, free_raw_data=False)
-
-lgb_train_data = lgb.Dataset(train_file, feature_name=predictors)
-#lgb_train_data.construct()
-#lgb_train_data.set_feature_name(predictors)
-#lgb_train_data.set_categorical_feature(cat_features)
 
 lgbm_params = {
     'boosting_type': 'gbdt',
@@ -89,16 +89,17 @@ print("\n Model parameters:\n", lgbm_params)
 
 
 # create cv indices
-fold = 4
-train_df = full_df[predictors][:train_len].values
-test_df = full_df[predictors][train_len:].values
+
+train_df = full_df[:train_len]
+test_df = full_df[train_len:]
 skf  = list(KFold(fold).split(train_df))
 print('\ntrain size: ', len(train_df))
 print('\ntest size: ', len(test_df))
 
 # save out-of-sample prediction for train data and prediction for test data
-train_oos_pred = np.zeros((train_len, 1))
-test_pred = np.zeros((test_len, 1))
+print("Running %d fold cross validation...\n" % fold)
+train_oos_pred = np.zeros((len(train_df),))
+test_pred = np.zeros((len(test_df),))
 scores = np.zeros((fold,))
 
 process = psutil.Process(os.getpid())
@@ -106,11 +107,21 @@ print("\n- - - - - - - Memory usage check: ", process.memory_info().rss/1048576)
 sys.stdout.flush()
 
 for i, (train, val) in  enumerate(skf):
-        print("Fold %d" % (i + 1))
+        if i not in run_folds:
+            continue
+        print("Fold %d" % (i))
         sys.stdout.flush()
         fold_start = time.time()
-        train_set = lgb_train_data.subset(train)
-        val_set = lgb_train_data.subset(val)
+        train_set = lgb.Dataset(train_df[predictors].iloc[train].values, 
+                               label=train_df[target].iloc[train].values,
+                               feature_name=predictors,
+                               categorical_feature=cat_features
+                               )
+        val_set = lgb.Dataset(train_df[predictors].iloc[val].values, 
+                               label=train_df[target].iloc[val].values,
+                               feature_name=predictors,
+                               categorical_feature=cat_features
+                               )
         evals_results = {}
         if early_stopping_rounds == 0:  # without early stopping
                 print("No early stopping...\n")
@@ -125,10 +136,9 @@ for i, (train, val) in  enumerate(skf):
                 print("\nModel Report:\n")
                 print("AUC :", evals_results['valid']['auc'][-1])
                 scores[i] = evals_results['valid']['auc'][-1]
-                train_oos_pred[val, 0] = bst.predict(train_df[val])
-                test_pred[:, 0] = test_pred[:, 0] + bst.predict(test_df)
-                print("Fold %d fitting finished in %0.3fs" 
-                        % (i + 1, time.time() - fold_start))
+                train_oos_pred[val] = bst.predict(train_df[predictors].iloc[val])
+                test_pred = bst.predict(test_df[predictors])
+                print("Fold %d fitting finished in %0.3fs" % (i, time.time() - fold_start))
         else:  # early stopping
                 print("use early stopping...\n")
                 bst = lgb.train(  lgbm_params
@@ -145,28 +155,15 @@ for i, (train, val) in  enumerate(skf):
                 print("best round : ", best_round)
                 print("AUC :", evals_results['valid']['auc'][best_round-1])
                 scores[i] = evals_results['valid']['auc'][best_round-1]
-                train_oos_pred[val, 0] = bst.predict(train_df[val])
-                test_pred[:, 0] = test_pred[:, 0] + bst.predict(test_df)
-                print("Fold %d fitting finished in %0.3fs" 
-                        % (i + 1, time.time() - fold_start))
+                train_oos_pred[val] = bst.predict(train_df[predictors].iloc[val])
+                test_pred = bst.predict(test_df[predictors])
+                print("Fold %d fitting finished in %0.3fs" % (i, time.time() - fold_start))
 
         print("Score for model is %f" % (scores[i]))
+        np.savez(npzfile+'_'+str(i), fold=i, train_ind=val, train_pred=train_oos_pred[val]
+                 , test_pred=test_pred, score=scores[i])
         sys.stdout.flush()
+        del train_set, val_set
         gc.collect()
 
-test_pred = test_pred / fold
-print("Score for blended models is %f" % (np.mean(scores)))
-sys.stdout.flush()
-
-process = psutil.Process(os.getpid())
-print("- - - - - - - Memory usage check: ", process.memory_info().rss/1048576)
-sys.stdout.flush()
-
-
-if debug:
-    np.savetxt("./model_outputs/debug_model_id1_train.csv", train_oos_pred, fmt='%.5f', delimiter=",")
-    np.savetxt("./model_outputs/debug_model_id1_test.csv", test_pred, fmt='%.5f', delimiter=",")
-else:
-    np.savetxt("./model_outputs/model_id1_train_pred.csv", train_oos_pred, fmt='%.5f', delimiter=",")
-    np.savetxt("./model_outputs/model_id1_test_pred.csv", test_pred, fmt='%.5f', delimiter=",")
-
+print("\nEnd of current fold...")
