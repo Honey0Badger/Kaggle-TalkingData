@@ -27,9 +27,9 @@ gc.collect()
 
 
 # read all test predictions
-test_m1 = np.loadtxt('./model_outputs/test_model_id1_test_pred.csv', delimiter=',')
+test_m1 = np.loadtxt('./model_outputs/f24_lgbm_4fold_cv_test.csv', delimiter=',')
 print("check dim of test from model 1: ", test_m1.shape)
 
 
 sub['is_attributed'] = pd.Series(test_m1, index=sub.index)
-sub.to_csv("./final_output/test_sub_LGBM_id1_small_train.csv", index=False, float_format='%1.5f')
+sub.to_csv("./final_output/sub_LGBM_id1_4fold_cv_mean_pred.csv", index=False, float_format='%1.5f')
