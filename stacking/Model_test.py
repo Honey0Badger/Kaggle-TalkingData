@@ -16,28 +16,16 @@ import pandas as pd
 from sklearn.model_selection import KFold
 import xgboost as xgb
 
-
 now = datetime.datetime.now()
 print("\nModel id: 2")
 print("Model type: XGB\n")
 print("Print timestamp for record...")
 print(now.strftime("%Y-%m-%d %H:%M"))
-if len(sys.argv) <= 2:
-    print("Usage: python *.py npzfile [fold #]")
-    exit()
-else:
-#    print("debug:", sys.argv)
-    npzfile = sys.argv[1]
-    run_folds = list(map(int, sys.argv[2:]))
-    print("Run the following folds for Model...", run_folds)
-    print("saving temperory data to file...", npzfile)
 sys.stdout.flush()
 
 start = time.time()
 
-debug = False
-fold = 4
-
+debug = True
 ##################### load pre-processed data #####################
 if debug:
     #full_df = pd.read_pickle('./pre_proc_inputs/debug_f28_full_data.pkl')
@@ -47,18 +35,18 @@ if debug:
     test_len = 49999
 else:
     #full_df = pd.read_pickle('./pre_proc_inputs/f28_full_data.pkl')
-    train_file = './pre_proc_inputs/f21_xgb_train.bin'
-    test_file = './pre_proc_inputs/f21_xgb_test.bin'
+    train_file = './pre_proc_inputs/f28_xgb_train.bin'
+    test_file = './pre_proc_inputs/f28_xgb_test.bin'
     train_len = 184903890
     test_len = 18790469
 
-predictors = [ 'app','channel','device','os','hour',
+predictors = [ 'app','channel','device','os','day','hour',
                'X0', 'X1', 'X2', 'X3', 'X4', 'X5', 'X6', 
-               'X7', 'X8', 'app_click_freq', 'ip_tcount', 'ip_app_count', 
+               'X7', 'X8', 'ip_tcount', 'ip_app_count', 
                'ip_app_os_count', 'ip_tchan_count', 'ip_app_os_var',
                'ip_app_channel_var_day', 'ip_app_channel_mean_hour', 
-               'nextClick']
-cat_features = ['app', 'device','os', 'channel', 'hour']
+               'nextClick', 'nextClick_shift' ]
+cat_features = ['app', 'device','os', 'channel', 'day', 'hour']
 
 target = 'is_attributed'
 
@@ -77,7 +65,7 @@ params = {'objective':'binary:logistic'
               , 'tree_method':'hist'
               , 'grow_policy':'lossguide'
               , 'gamma': 5.104e-8
-              , 'learning_rate': 0.15
+              , 'learning_rate': 0.2
               , 'max_depth': 6
               , 'max_delta_step': 20
               , 'min_child_weight': 4
@@ -89,7 +77,7 @@ params = {'objective':'binary:logistic'
               , 'reg_alpha': 1e-9
               , 'reg_lambda': 1000
               , 'silent': True
-              , 'updater': 'grow_gpu'
+              #, 'updater': 'grow_gpu'
             }
 
 num_boost_round = 100
@@ -98,10 +86,10 @@ print("\n Model parameters:\n", params)
 
 
 
-print("Running %d fold cross validation...\n" % fold)
+fold = 4
 # save out-of-sample prediction for train data and prediction for test data
-train_oos_pred = np.zeros((train_len,))
-test_pred = np.zeros((test_len,))
+train_oos_pred = np.zeros((train_len, 1))
+test_pred = np.zeros((test_len, fold))
 
 # create cv indices
 skf  = list(KFold(fold).split(train_oos_pred))
@@ -112,9 +100,7 @@ print("\n- - - - - - - Memory usage check: ", process.memory_info().rss/1048576)
 sys.stdout.flush()
 
 for i, (train, val) in  enumerate(skf):
-        if i not in run_folds:
-            continue
-        print("Fold %d" % (i))
+        print("Fold %d" % (i + 1))
         sys.stdout.flush()
         fold_start = time.time()
         train_set = dtrain.slice(train)
@@ -133,9 +119,9 @@ for i, (train, val) in  enumerate(skf):
                 print("\nModel Report:\n")
                 print("AUC :", evals_results['valid']['auc'][-1])
                 scores[i] = evals_results['valid']['auc'][-1]
-                train_oos_pred[val] = bst.predict(val_set)
-                test_pred = bst.predict(dtest)
-                print("Fold %d fitting finished in %0.3fs" % (i, time.time() - fold_start))
+                train_oos_pred[val, 0] = bst.predict(val_set)
+                test_pred[:, i] = bst.predict(dtest)
+                print("Fold %d fitting finished in %0.3fs" % (i + 1, time.time() - fold_start))
         else:  # early stopping
                 bst = xgb.train(params
                                 , train_set
@@ -150,17 +136,27 @@ for i, (train, val) in  enumerate(skf):
                 print("N_estimators : ", best_round)
                 print("AUC :", evals_results['valid']['auc'][best_round-1])
                 scores[i] = evals_results['valid']['auc'][best_round-1]
-                train_oos_pred[val] = bst.predict(val_set, ntree_limit=bst.best_ntree_limit)
-                test_pred = bst.predict(dtest, ntree_limit=bst.best_ntree_limit)
-                print("Fold %d fitting finished in %0.3fs" % (i, time.time() - fold_start))
+                train_oos_pred[val, 0] = bst.predict(val_set, ntree_limit=bst.best_ntree_limit)
+                test_pred[:, i] = bst.predict(dtest, ntree_limit=bst.best_ntree_limit)
+                print("Fold %d fitting finished in %0.3fs" % (i + 1, time.time() - fold_start))
 
         print("Score for model is %f" % (scores[i]))
-        np.savez(npzfile+'_'+str(i), fold=i, train_ind=val, train_pred=train_oos_pred[val]
-                 , test_pred=test_pred, score=scores[i])
-        process = psutil.Process(os.getpid())
-        print("\n- - - - - - - Memory usage check: ", process.memory_info().rss/1048576)
         sys.stdout.flush()
-        del train_set, val_set
         gc.collect()
 
-print("\nEnd of current fold...")
+test_pred_blend = np.mean(test_pred, axis=1)
+print("Score for blended models is %f" % (np.mean(scores)))
+
+process = psutil.Process(os.getpid())
+print("- - - - - - - Memory usage check: ", process.memory_info().rss/1048576)
+sys.stdout.flush()
+
+
+if debug:
+    np.savetxt("./model_outputs/debug_model_id3_train.csv", train_oos_pred, fmt='%.5f', delimiter=",")
+    np.savetxt("./model_outputs/debug_model_id3_test.csv", test_pred_blend, fmt='%.5f', delimiter=",")
+else:
+    np.savetxt("./model_outputs/model_xgb_id2_train_pred.csv", train_oos_pred, fmt='%.5f', delimiter=",")
+    np.savetxt("./model_outputs/model_xgb_id2_test_pred.csv", test_pred_blend, fmt='%.5f', delimiter=",")
+
+print('time consumed:', time.time()-start)

@@ -5,19 +5,21 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.linear_model import ElasticNet, Ridge, LinearRegression
 
 import lightgbm as lgb
+
+#from keras.callbacks import EarlyStopping, ModelCheckpoint
+
 import xgboost as xgb
 
-from preprocess import *
+from preprocess2 import *
 from models import *
 from metric import *
 
 import sys
 import gc
 import numpy as np
-import pandas as pd
 import time
 
-def search_model(train_x, train_y, est, param_grid, n_jobs, cv, refit=False):
+def search_model(train_x, train_y, est, param_grid, n_jobs, cv, refit=False, save_log=None):
     ##Grid Search for the best model
     model = GridSearchCV(estimator=est,
                          param_grid=param_grid,
@@ -38,8 +40,9 @@ def search_model(train_x, train_y, est, param_grid, n_jobs, cv, refit=False):
     print("**********************************************")
     sys.stdout.flush()
 
-    # saving all model scores
-    np.savez('../output/grid_model_scores.npz', model.cv_results_)
+    if save_log != None:
+        # saving all model scores
+        np.savez(save_log, model.cv_results_)
 
     return model
 
@@ -55,40 +58,20 @@ def LGBM_DataSet(train_df, valid_df, predictors, target, cat_features):
     return train, valid
 
 
-def single_LGBM_train(params, train, valid, metrics, num_boost_round=100, early_stopping_rounds=20):
+def single_LGBM_train(params, train, valid, metrics, early_stopping_rounds=20):
     evals_results = {}
-    if early_stopping_rounds == 0:
-        bst = lgb.train(params
-                        , train
-                        , num_boost_round=num_boost_round
-                        , valid_sets=[train, valid]
-                        , valid_names=['train', 'valid']
-                        , evals_result=evals_results 
-                        , verbose_eval=10
-                        )
-        n_estimators = num_boost_round
-    else:
-        bst = lgb.train(params
-                        , train
-                        , num_boost_round=1000
-                        , valid_sets=[train, valid]
-                        , valid_names=['train', 'valid']
-                        , evals_result=evals_results 
-                        , early_stopping_rounds=early_stopping_rounds
-                        , verbose_eval=10
-                        )
-        n_estimators = bst.best_iteration
+    bst = lgb.train(params
+                    , train
+                    , valid_sets=[train, valid]
+                    , valid_names=['train', 'valid']
+                    , evals_result=evals_results 
+                    , early_stopping_rounds=early_stopping_rounds
+                    , verbose_eval=10
+                    )
+    n_estimators = bst.best_iteration
     print("\nModel Report:")
     print("N_estimators : ", n_estimators)
     print(metrics+":", evals_results['valid'][metrics][n_estimators-1])
-    print("\nFeature importance...")
-    gain = bst.feature_importance('gain')
-    ft = pd.DataFrame({'feature': bst.feature_name(), 
-                       'split': bst.feature_importance('split'),
-                       'gain': 100*gain / gain.sum()
-                      }).sort_values('gain', ascending=False)
-    print(ft)
-    print("\n***** End of feature importance *****")
 
     return bst
 

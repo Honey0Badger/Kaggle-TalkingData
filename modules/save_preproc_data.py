@@ -9,8 +9,8 @@ import math
 
 import pandas as pd
 
-#from preprocess import *
-from preprocess2 import *
+#from preprocess4 import *
+from feature_test import *
 
 now = datetime.datetime.now()
 print("Print timestamp for record...")
@@ -21,7 +21,7 @@ start = time.time()
 
 train_file = '../input/train.csv'
 test_file = '../input/test.csv'
-full_df, len_train, predictors = read_merge_process2(train_file, ftest=test_file)
+full_df, len_train, predictors = read_merge_process5(train_file, ftest=test_file)
 print("*************************  Full data info **********************************\n")
 full_df.info()
 print("*************************  End of data info **********************************\n")
@@ -31,4 +31,4 @@ process = psutil.Process(os.getpid())
 print("- - - - - - - Memory usage check: ", process.memory_info().rss/1048576)
 sys.stdout.flush()
 
-full_df.to_pickle('22_feature_bot60m_data.pkl')
+full_df.to_pickle('26_feature_bot60m_data.pkl')

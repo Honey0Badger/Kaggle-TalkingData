@@ -27,14 +27,16 @@ gc.collect()
 
 
 # read all test predictions
-test_m1 = np.loadtxt('./model_outputs/f24_xgb_4fold_cv_test.csv', delimiter=',')
+test_m1 = np.loadtxt('./model_outputs/f21_xgb_4fold_cv_test.csv', delimiter=',')
 print("check dim of test from model 1: ", test_m1.shape)
 
-test_m2 = np.loadtxt('./model_outputs/f24_lgbm_4fold_cv_test.csv', delimiter=',')
+# simgple average 
+
+test_m2 = np.loadtxt('./model_outputs/f21_lgbm_4fold_cv_test.csv', delimiter=',')
 print("check dim of test from model 2: ", test_m2.shape)
 
-w1 = 0.5
+w1 = 0.4
 test_avg = test_m1 * w1 + test_m2 * (1-w1)
 
 sub['is_attributed'] = pd.Series(test_avg, index=sub.index)
-sub.to_csv("./final_output/sub_LGBM_XGB_mean_pred.csv", index=False, float_format='%1.5f')
+sub.to_csv("./final_output/sub_f21_LGBM6_XGB4_mean_pred.csv", index=False, float_format='%1.5f')

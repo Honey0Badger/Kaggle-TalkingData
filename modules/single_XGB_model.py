@@ -42,18 +42,17 @@ start = time.time()
 ##################### end of process data needed ######################
 
 ##################### load pre-processed data #####################
-full_df = pd.read_pickle('./18_feature_bot60m_data.pkl')
-predictors = ['app','device','os','channel','weekday','hour', 
-                  'ip_app_count_chns', 'app_click_freq','app_freq',
-                  'channel_freq',  'ip_day_hour_count_chns', 
-                  'ip_app_os_count_chns',  'ip_day_chn_var_hour',
-                  'ip_app_chn_mean_hour', 'ip_nextClick',  'ip_app_nextClick',
-                  'ip_chn_nextClick', 'ip_os_nextClick' ]
+full_df = pd.read_pickle('21_feature_bot60m_data.pkl')
 
-cat_features = ['app', 'device','os', 'channel', 'weekday', 'hour']
-
-len_train = 60000000
+predictors = [ 'app','channel','device','os','hour',
+               'X0', 'X1', 'X2', 'X3', 'X4', 'X5', 'X6', 
+               'X7', 'X8', 'app_click_freq', 'ip_tcount', 'ip_app_count', 
+               'ip_app_os_count', 'ip_tchan_count', 'ip_app_os_var',
+               'ip_app_channel_var_day', 'ip_app_channel_mean_hour', 
+               'nextClick']
+cat_features = ['app', 'device','os', 'channel', 'hour']
 target = 'is_attributed'
+len_train = 60000000
 
 print("*************************  Full data info **********************************\n")
 full_df.info()
@@ -89,14 +88,15 @@ gc.collect()
 
 xgb_params = {'objective':'binary:logistic'
               , 'eval_metric' : 'auc'
-              , 'tree_method':'approx'
+              , 'tree_method':'hist'
+              , 'grow_policy':'lossguide'
               , 'gamma': 5.104e-8
               , 'learning_rate': 0.15
-              , 'max_depth': 6
+              , 'max_depth': 5
               , 'max_delta_step': 20
-              , 'min_child_weight': 4
-              , 'subsample': 1.0
-              , 'colsample_bytree': 1.0
+              , 'min_child_weight': 0.5
+              , 'subsample': 0.4
+              , 'colsample_bytree': 0.7
               , 'colsample_bylevel': 0.1
               , 'scale_pos_weight': 500
               , 'random_state': 300
@@ -104,6 +104,9 @@ xgb_params = {'objective':'binary:logistic'
               , 'reg_lambda': 1000
               , 'silent': True
             }
+
+print("Current model parameters:\n")
+print(xgb_params)
 
 xgb_model = single_XGB_train(  xgb_params, 
                                Dtrain, 
@@ -116,8 +119,6 @@ print("Current process memory usage: ", process.memory_info().rss/1048576)
 del Dtrain, Dvalid
 gc.collect()
 
-print("Current model parameters:\n")
-print(xgb_params)
 
 Dtest = XGB_Dtest(test_df, predictors)
 
@@ -127,5 +128,5 @@ print("Current process memory usage: ", process.memory_info().rss/1048576)
 sub = pd.DataFrame()
 sub['click_id'] = test_df['click_id'].astype('int')
 sub['is_attributed'] = xgb_model.predict(Dtest, ntree_limit=xgb_model.best_ntree_limit)
-sub.to_csv("../output/xgb_f17_bot6m_SM_kernal_param.csv", index=False, float_format='%1.5f')
+sub.to_csv("../output/xgb_f21_bot6m_SM_kernal_param.csv", index=False, float_format='%1.5f')
 
