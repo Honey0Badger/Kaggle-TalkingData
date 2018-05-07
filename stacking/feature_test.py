@@ -10,8 +10,8 @@ import math
 
 def read_merge_process5(ftrain, ftest=None):
     if (ftest != None):
-        train_df = load_half_file(ftrain)
-        #train_df = load_from_file(ftrain)
+        #train_df = load_half_file(ftrain)
+        train_df = load_from_file(ftrain)
         len_train = len(train_df)
         test_df = load_from_file(ftest)
         train_df = train_df.append(test_df)

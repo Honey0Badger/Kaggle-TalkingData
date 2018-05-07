@@ -47,17 +47,19 @@ if debug:
     test_len = 49999
 else:
     #full_df = pd.read_pickle('./pre_proc_inputs/f28_full_data.pkl')
-    train_file = './pre_proc_inputs/f21_xgb_train.bin'
-    test_file = './pre_proc_inputs/f21_xgb_test.bin'
+    train_file = './pre_proc_inputs/f30_xgb_train.bin'
+    test_file = './pre_proc_inputs/f30_xgb_test.bin'
     train_len = 184903890
     test_len = 18790469
 
-predictors = [ 'app','channel','device','os','hour',
-               'X0', 'X1', 'X2', 'X3', 'X4', 'X5', 'X6', 
-               'X7', 'X8', 'app_click_freq', 'ip_tcount', 'ip_app_count', 
-               'ip_app_os_count', 'ip_tchan_count', 'ip_app_os_var',
-               'ip_app_channel_var_day', 'ip_app_channel_mean_hour', 
-               'nextClick']
+predictors = ['nextClick', 'app','device','os', 'channel', 'hour', 
+                  'app_click_freq', 'app_os_click_freq', 'app_dev_click_freq',
+                  'chn_os_click_freq', 'chn_dev_click_freq',
+                  'ip_tcount', 'ip_app_count',
+                  'ip_app_os_count', 'ip_app_os_var',
+                  'ip_app_channel_var_day',
+                  'X0', 'X1', 'X2', 'X3', 'X4', 'X5', 'X6', 'X7', 'X8',
+                  'ip_app_nextClick','ip_chn_nextClick','ip_os_nextClick']
 cat_features = ['app', 'device','os', 'channel', 'hour']
 
 target = 'is_attributed'
@@ -93,7 +95,7 @@ params = {'objective':'binary:logistic'
             }
 
 num_boost_round = 100
-early_stopping_rounds = 30
+early_stopping_rounds = 40
 print("\n Model parameters:\n", params)
 
 

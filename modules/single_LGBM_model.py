@@ -14,6 +14,19 @@ from feature_test import *
 from models import *
 from pipelines import *
 
+
+def add_feature(full_df, feature):
+    fname = './features/'+feature+'.csv'
+    f_col = pd.read_csv(fname)
+    if len(f_col) != len(full_df):
+        print("feature %s dimension not equal to data dim" % (feature))
+        exit()
+    full_df[feature] = f_col[feature].values
+    del f_col
+    gc.collect()
+    return full_df
+
+
 now = datetime.datetime.now()
 print("Print timestamp for record...")
 print(now.strftime("%Y-%m-%d %H:%M"))
@@ -22,46 +35,28 @@ sys.stdout.flush()
 start = time.time()
 
 debug = False
-#################### load raw data ##################################
-##
-#if debug:
-#    train_file = '../input/train_debug.csv'
-#    test_file = '../input/test_debug.csv'
-#else:
-#    train_file = '../input/train.csv'
-#    test_file = '../input/test.csv'
-#
-#full_df, len_train, predictors = read_merge_process3(train_file, ftest=test_file)
-#print("*************************  Full data info **********************************\n")
-#full_df.info()
-#print("*************************  End of data info **********************************\n")
-#sys.stdout.flush()
-#            
-#process = psutil.Process(os.getpid())
-#print("- - - - - - - Memory usage check: ", process.memory_info().rss/1048576)
-#sys.stdout.flush()
-#
-#print('all columns:\n', list(full_df), "\n")
-#target = 'is_attributed'
-#
-#print('Predictors used for training: \n', predictors, "\n")
-#cat_features = ['app', 'device','os', 'channel', 'hour']
-#sys.stdout.flush()
-################## end of loading and processing raw data #######
 
 ##################### load pre-processed data #####################
-full_df = pd.read_pickle('26_feature_bot60m_data.pkl')
+full_df = pd.read_pickle('28_feature_bot60m_data.pkl')
 
 predictors = ['nextClick', 'app','device','os', 'channel', 'hour', 
                   'app_click_freq', 'app_os_click_freq', 'app_dev_click_freq',
                   'chn_os_click_freq', 'chn_dev_click_freq',
-                  'ip_tcount', 'ip_tchan_count', 'ip_app_count',
+                  'ip_tcount', 'ip_app_count',
                   'ip_app_os_count', 'ip_app_os_var',
-                  'ip_app_channel_var_day','ip_app_channel_mean_hour',
-                  'X0', 'X1', 'X2', 'X3', 'X4', 'X5', 'X6', 'X7', 'X8']
-
+                  'ip_app_channel_var_day',
+                  'X0', 'X1', 'X2', 'X3', 'X4', 'X5', 'X6', 'X7', 'X8',
+                  'ip_app_nextClick','ip_chn_nextClick','ip_os_nextClick']
 cat_features = ['app', 'device','os', 'channel', 'hour']
 target = 'is_attributed'
+
+# adding features from separate files
+#full_df = add_feature( full_df, 'ip_app_nextClick')
+#predictors.append('ip_app_nextClick')
+#full_df = add_feature('ip_os_next_Click')
+#full_df = add_feature('ip_chn_nextClick')
+#full_df = add_feature('ip_app_nextClick')
+
 len_train = 60000000
 
 
@@ -94,13 +89,13 @@ lgbm_params = {
     'boosting_type': 'gbdt',
     'objective': 'binary',
     'metric': 'auc',
-    'learning_rate': 0.07,
+    'learning_rate': 0.1,
     'num_leaves': 20,  # 2^max_depth - 1
-    'max_depth': 13,  # -1 means no limit
-    'min_data_in_leaf': 20,
-    'max_bin': 170,  # Number of bucketed bin for feature values
-    'subsample': 0.05,  # Subsample ratio of the training instance.
-    'colsample_bytree': 0.45,  # Subsample ratio of columns when constructing each tree.
+    'max_depth': 6,  # -1 means no limit
+    'min_data_in_leaf': 90,
+    'max_bin': 150,  # Number of bucketed bin for feature values
+    'subsample': 0.9,  # Subsample ratio of the training instance.
+    'colsample_bytree': 1.0,  # Subsample ratio of columns when constructing each tree.
     'min_child_weight': 1e-3,  # Minimum sum of instance weight(hessian) needed in a child(leaf)
     'subsample_for_bin': 200000,
     'min_split_gain': 0,
@@ -118,8 +113,8 @@ lgbm_model = single_LGBM_train(lgbm_params,
                                train_dataset, 
                                valid_dataset, 
                                metrics='auc',
-                               num_boost_round=160,
-                               early_stopping_rounds=0)
+                               num_boost_round=1000,
+                               early_stopping_rounds=50)
 
 process = psutil.Process(os.getpid())
 print("- - - - - - - Memory usage check: ", process.memory_info().rss/1048576)
@@ -133,5 +128,5 @@ sub['is_attributed'] = lgbm_model.predict(test_df[predictors])
 if debug:
     sub.to_csv("./tmp/debug_sub.csv", index=False, float_format='%1.5f')
 else:
-    sub.to_csv("../output/lgbm_f26_SM_bot60m_gridCV_param.csv", index=False, float_format='%1.5f')
+    sub.to_csv("../output/lgbm_f30_SM_bot60m_gridCV_param.csv", index=False, float_format='%1.5f')
 

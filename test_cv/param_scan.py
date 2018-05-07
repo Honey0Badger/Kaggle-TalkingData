@@ -8,44 +8,41 @@ import math
 
 import pandas as pd
 
-#from preprocess import *
 from models import lgbm_est_base, xgb_est_base
 from preprocess4 import *
 from pipelines import *
 
 start = time.time()
 
-#train_file = '../input/train_CV_sample.csv'
-#full_df, len_train, predictors = read_merge_process4(train_file)
-#full_df.to_pickle('21_feature.pkl')
+full_df = pd.read_csv('f30_cv_sample.csv')
 
-full_df = pd.read_pickle('21_feature.pkl')
-
-predictors = [ 'app','channel','device','os','hour',
-               'X0', 'X1', 'X2', 'X3', 'X4', 'X5', 'X6', 
-               'X7', 'X8', 'app_click_freq', 'ip_tcount', 'ip_app_count', 
-               'ip_app_os_count', 'ip_tchan_count', 'ip_app_os_var',
-               'ip_app_channel_var_day', 'ip_app_channel_mean_hour', 
-               'nextClick']
+predictors = ['nextClick', 'app','device','os', 'channel', 'hour', 
+                  'app_click_freq', 'app_os_click_freq', 'app_dev_click_freq',
+                  'chn_os_click_freq', 'chn_dev_click_freq',
+                  'ip_tcount', 'ip_app_count',
+                  'ip_app_os_count', 'ip_app_os_var',
+                  'ip_app_channel_var_day',
+                  'X0', 'X1', 'X2', 'X3', 'X4', 'X5', 'X6', 'X7', 'X8',
+                  'ip_app_nextClick','ip_chn_nextClick','ip_os_nextClick']
+target = 'is_attributed'
 
 len_train = len(full_df)
 print('**************** full data info *****************\n')
-full_df.info()
+full_df[predictors+[target]].info()
 print('**************** end of data info *****************\n')
 
-target = 'is_attributed'
 
-gridParams = {
-         'learning_rate': [0.07],
-         'n_estimators':  [40]
-         ,'max_depth': [13]
+gridParams_lgbm = {
+         'learning_rate': [0.1],
+         'n_estimators':  [170]
+         ,'max_depth': [6]
          ,'min_child_weight': [1e-3]
-         ,'min_data_in_leaf': [20]
+         ,'min_data_in_leaf': [90]
          ,'num_leaves': [20]
-         ,'max_bin':  [170]
+         ,'max_bin':  [150]
          ,'random_state': [501]
-         ,'colsample_bytree': [0.45]
-         ,'subsample': [0.05]
+         ,'colsample_bytree': [1.0]
+         ,'subsample': [0.9]
          #,'is_unbalance': [True]
          }
 
@@ -80,4 +77,4 @@ gridParams_xgb = {
 #print("Default parameters:")
 #print(lgbm_est_base.get_params())
 
-search_model(full_df[predictors], full_df[target], xgb_est_base, gridParams_xgb, n_jobs=1, cv=10, refit=False)
+search_model(full_df[predictors], full_df[target], lgbm_est_base, gridParams_lgbm, n_jobs=1, cv=5, refit=False)

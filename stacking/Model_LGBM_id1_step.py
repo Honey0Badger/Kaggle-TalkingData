@@ -35,23 +35,26 @@ sys.stdout.flush()
 start = time.time()
 
 debug = False
-fold = 10
+fold = 4
 ##################### load pre-processed data #####################
 if debug:
-    full_df = pd.read_pickle('./pre_proc_inputs/debug_f21_full_data.pkl')
+    full_df = pd.read_pickle('./pre_proc_inputs/debug_f30_full_data.pkl')
     train_len = 49999
     test_len = 49999
 else:
-    full_df = pd.read_pickle('./pre_proc_inputs/f21_full_data.pkl')
+    full_df = pd.read_pickle('./pre_proc_inputs/f30_full_data.pkl')
     train_len = 184903890
     test_len = 18790469
 
-predictors = [ 'app','channel','device','os','hour',
-               'X0', 'X1', 'X2', 'X3', 'X4', 'X5', 'X6', 
-               'X7', 'X8', 'app_click_freq', 'ip_tcount', 'ip_app_count', 
-               'ip_app_os_count', 'ip_tchan_count', 'ip_app_os_var',
-               'ip_app_channel_var_day', 'ip_app_channel_mean_hour', 
-               'nextClick']
+predictors = ['nextClick', 'app','device','os', 'channel', 'hour', 
+                  'app_click_freq', 'app_os_click_freq', 'app_dev_click_freq',
+                  'chn_os_click_freq', 'chn_dev_click_freq',
+                  'ip_tcount', 'ip_app_count',
+                  'ip_app_os_count', 'ip_app_os_var',
+                  'ip_app_channel_var_day',
+                  'X0', 'X1', 'X2', 'X3', 'X4', 'X5', 'X6', 'X7', 'X8',
+                  'ip_app_nextClick','ip_chn_nextClick','ip_os_nextClick']
+
 cat_features = ['app', 'device','os', 'channel', 'hour']
 
 target = 'is_attributed'
@@ -67,13 +70,13 @@ lgbm_params = {
     'boosting_type': 'gbdt',
     'objective': 'binary',
     'metric': 'auc',
-    'learning_rate': 0.07,
+    'learning_rate': 0.1,
     'num_leaves': 20,  # 2^max_depth - 1
-    'max_depth': 13,  # -1 means no limit
-    'min_child_samples': 20,  # Minimum number of data need in a child(min_data_in_leaf)
-    'max_bin': 170,  # Number of bucketed bin for feature values
-    'subsample': 0.05,  # Subsample ratio of the training instance.
-    'colsample_bytree': 0.45,  # Subsample ratio of columns when constructing each tree.
+    'max_depth': 6,  # -1 means no limit
+    'min_child_samples': 90,  # Minimum number of data need in a child(min_data_in_leaf)
+    'max_bin': 150,  # Number of bucketed bin for feature values
+    'subsample': 0.9,  # Subsample ratio of the training instance.
+    'colsample_bytree': 1.0,  # Subsample ratio of columns when constructing each tree.
     'min_child_weight': 1e-3,  # Minimum sum of instance weight(hessian) needed in a child(leaf)
     'subsample_for_bin': 200000,
     'min_split_gain': 0,
@@ -81,7 +84,7 @@ lgbm_params = {
     'reg_lambda': 0,
     'scale_pos_weight':300 # because training data is extremely unbalanced 
 }
-early_stopping_rounds = 30
+early_stopping_rounds = 50
 num_boost_round = 100
 print("\n Model parameters:\n", lgbm_params)
 
