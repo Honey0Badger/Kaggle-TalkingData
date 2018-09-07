@@ -2,6 +2,8 @@ from models import *
 
 import numpy as np 
 import pandas as pd 
+from sklearn.model_selection import StratifiedKFold, KFold
+from sklearn.model_selection import GridSearchCV
 
 def LGBM_model_full_train(train_X, train_y, test_X, params, cat_features):
     """ LightGBM model train on entire training set (no early stop,
@@ -29,3 +31,28 @@ def LGBM_model_full_train(train_X, train_y, test_X, params, cat_features):
     pred = bst.predict(test_X)
 
     return pred
+
+
+def gridCV(train_x, train_y, est, param_grid, n_jobs, cv, refit=False):
+    ##Grid Search for the best model
+    model = GridSearchCV(estimator=est,
+                         param_grid=param_grid,
+                         scoring='roc_auc',
+                         verbose=10,
+                         n_jobs=n_jobs,
+                         iid=True,
+                         refit=refit,
+                         cv=cv)
+    # Fit Grid Search Model
+    model.fit(train_x, train_y)
+    print("params:\n")
+    print(model.cv_results_.__getitem__('params'))
+    print("mean test scores:\n")
+    print(model.cv_results_.__getitem__('mean_test_score'))
+    print("std test scores:\n")
+    print(model.cv_results_.__getitem__('std_test_score'))
+    print("Best score: %0.3f" % model.best_score_)
+    print("Best parameters set:", model.best_params_)
+    print("**********************************************")
+
+    return model

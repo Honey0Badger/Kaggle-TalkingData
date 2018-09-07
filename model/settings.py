@@ -4,14 +4,14 @@ from pipelines import *
 
 #################   data preparation section   ###################
 ID = 'click_id'
-target = 'is_attributed'
+TARGET = 'is_attributed'
 
 # this is NOT RAW data, this is processed data, put 
 # in the same directory as engineered features
-train_file = 'train.csv'
-test_file = 'test.csv'
+TRAIN_FILE = 'train.csv'
+TEST_FILE = 'test.csv'
 
-feature_list = [
+FEATURE_LIST = [
                  ( do_countuniq, [ ['ip'], 'channel', 'X0'                                  ]),
                  (  do_cumcount, [ ['ip', 'device', 'os'], 'app', 'CM1'                     ]),
                  ( do_countuniq, [ ['ip','day'], 'hour', 'CU2'                              ]),
@@ -36,12 +36,19 @@ feature_list = [
 #################   end of data preparation section   ###################
 
 #################   model and task section   ####################
-select_features = ['X0', 'CU2', 'CU7']                           # set to None if all features are used
-drop_feat = ['click_time', 'epochtime', 'attributed_time']       # discard some features from original dataframe
-categorical = None
 
-model_list = [
-                 ( LGBM_model_full_train, [lgb_param1, categorical] ),
-                 ( LGBM_model_full_train, [lgb_param2, categorical] )
+## for model search with gridCV
+GRIDCV_EST = lgb_est
+GRIDCV_PARAM = param_grid
+CV_FOLD = 4
+
+## for train multiple model and make predictions
+SELECT_FEATURES = ['X0', 'CU2', 'CU7']                           # set to None if all features are used
+DROP_FEAT = ['click_time', 'epochtime', 'attributed_time']       # discard some features from original dataframe
+CAT_FEATURES = None
+
+MODEL_LIST = [
+                 ( LGBM_model_full_train, [lgb_param1, CAT_FEATURES] ),
+                 ( LGBM_model_full_train, [lgb_param2, CAT_FEATURES] )
              ]
 #################   end of model and task section   ####################
