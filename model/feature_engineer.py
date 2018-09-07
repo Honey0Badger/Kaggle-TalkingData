@@ -1,3 +1,8 @@
+"""
+The following functions are an ensemble of engineered features from Kaggle talkingData public
+discussion forum. Not all of them are used for the final model.
+"""
+
 import pandas as pd
 import random
 import numpy as np
